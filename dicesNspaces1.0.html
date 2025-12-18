@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Кубики и территории — baseline v4 UI+</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- Top bar -->
+  <header class="topbar">
+    <button class="iconBtn" id="menuBtn" aria-label="Открыть меню" title="Меню">
+      <span class="burger"></span>
+    </button>
+
+    <div class="brand">
+      <div class="brandTitle">Кубики и территории</div>
+      <div class="brandSub">КУШ + контуры (poly) + логирование • baseline v4</div>
+    </div>
+
+    <div class="topbarRight">
+      <span class="badge" id="viewMode">LIVE</span>
+
+      <div class="scorePills">
+        <span class="pill">
+          <span class="dot p1"></span>
+          <span class="name" id="nameP1Top">Игрок 1</span>
+          <b id="scoreP1">0</b>
+        </span>
+        <span class="pill">
+          <span class="dot p2"></span>
+          <span class="name" id="nameP2Top">Игрок 2</span>
+          <b id="scoreP2">0</b>
+        </span>
+        <span class="pill subtle">Free <b id="freeTop">0</b></span>
+      </div>
+
+      <button class="primary" id="newGame">Новая</button>
+    </div>
+  </header>
+
+  <!-- Drawer -->
+  <div class="overlay" id="overlay" hidden></div>
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawerHeader">
+      <div>
+        <div class="drawerTitle">Настройки</div>
+        <div class="drawerSub">Изменения применяются при “Новая игра”</div>
+      </div>
+      <button class="iconBtn" id="closeDrawer" aria-label="Закрыть" title="Закрыть">✕</button>
+    </div>
+
+    <div class="drawerBody">
+      <div class="hintBox">
+        <div class="hintTitle">Имена игроков</div>
+        <div class="formGrid oneCol">
+          <label>Имя P1</label>
+          <input id="nameP1" type="text" maxlength="24" value="Игрок 1" />
+          <label>Имя P2</label>
+          <input id="nameP2" type="text" maxlength="24" value="Игрок 2" />
+        </div>
+      </div>
+
+      <div class="hintBox">
+        <div class="hintTitle">Поле</div>
+        <div class="formGrid">
+          <label>Ширина</label>
+          <input id="w" type="number" min="5" max="120" value="50" />
+          <label>Высота</label>
+          <input id="h" type="number" min="5" max="120" value="50" />
+
+          <label>Клетка (px)</label>
+          <input id="cell" type="number" min="6" max="30" value="12" />
+
+          <label>Старт P1</label>
+          <select id="corner">
+            <option value="TL">Левый верхний</option>
+            <option value="TR">Правый верхний</option>
+            <option value="BL">Левый нижний</option>
+            <option value="BR">Правый нижний</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="hintBox">
+        <div class="hintTitle">Горячие клавиши</div>
+        <div class="hintText">
+          <span class="kbd">R</span> — бросок •
+          <span class="kbd">S</span> — ориентация •
+          <span class="kbd">Space</span> — пропуск
+        </div>
+      </div>
+
+      <div class="hintBox">
+        <div class="hintTitle">Контуры</div>
+        <div class="hintText">
+          Захват после каждого хода: всё “внутри” петли из ваших клеток становится вашим (включая клетки соперника).
+          Для “П/угла” разрешены дуги по 1 стороне поля или по 2 соседним сторонам.
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <section class="left">
+      <div class="panel">
+        <div class="panelTop">
+          <div class="turnLine">
+            <span class="label">Ход:</span> <span class="value" id="turn">—</span>
+          </div>
+
+          <div class="diceRow">
+            <div class="diceWrap">
+              <div class="dice" id="dieA" aria-label="Кость A">
+                <div class="pipGrid" id="dieAGrid">
+                  <span class="pip"></span><span class="pip"></span><span class="pip"></span>
+                  <span class="pip"></span><span class="pip"></span><span class="pip"></span>
+                  <span class="pip"></span><span class="pip"></span><span class="pip"></span>
+                </div>
+              </div>
+              <div class="dice" id="dieB" aria-label="Кость B">
+                <div class="pipGrid" id="dieBGrid">
+                  <span class="pip"></span><span class="pip"></span><span class="pip"></span>
+                  <span class="pip"></span><span class="pip"></span><span class="pip"></span>
+                  <span class="pip"></span><span class="pip"></span><span class="pip"></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="diceMeta">
+              <div class="metaLine">
+                <span class="label">Ориентация:</span> <span class="value" id="orient">—</span>
+              </div>
+              <div class="metaLine">
+                <span class="label">Режим:</span> <span class="value" id="mode">—</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="btnRow">
+            <button id="roll">Бросить</button>
+            <button id="swap" disabled>Повернуть</button>
+            <button id="skip" disabled>Пропуск</button>
+          </div>
+
+          <div class="msg" id="msg"></div>
+        </div>
+
+        <div class="split">
+          <div class="splitHead">
+            <h2>Журнал</h2>
+            <div class="miniRow">
+              <label>Ход №</label>
+              <input id="gotoN" class="wide" type="number" min="0" step="1" value="0" />
+              <button id="gotoBtn">Перейти</button>
+              <button id="backLive">К последнему</button>
+            </div>
+          </div>
+          <div class="logBox" id="logBox"></div>
+        </div>
+
+        <div class="split">
+          <div class="splitHead">
+            <h2>Экспорт / импорт (JSON)</h2>
+            <div class="miniRow">
+              <button id="exportBtn">JSON</button>
+              <button id="loadBtn">Загрузить</button>
+              <button id="copyBtn">Скопировать</button>
+            </div>
+          </div>
+          <textarea id="jsonArea" placeholder="Сформируйте JSON или вставьте сюда и нажмите “Загрузить”."></textarea>
+        </div>
+      </div>
+    </section>
+
+    <section class="right">
+      <div class="canvasPanel">
+        <div class="canvasHeader">
+          <div class="canvasTitle">Поле</div>
+          <div class="canvasSub">клик — поставить прямоугольник</div>
+        </div>
+        <div class="canvasWrap">
+          <canvas id="cv"></canvas>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
+
