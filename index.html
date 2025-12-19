@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dices-n-Spaces</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="container">
+    
+    <header class="app-header">
+      <div class="header-brand">
+        <h1><i class="fas fa-dice"></i> Dices-n-Spaces</h1>
+        <p class="subtitle">A territory conquest game with dice & strategy</p>
+      </div>
+      <div class="header-actions">
+        <button id="newGameBtn" class="btn btn-primary btn-header">
+          <i class="fas fa-play-circle"></i> New Game
+        </button>
+        <button id="settingsToggle" class="btn-icon" title="Settings">
+          <i class="fas fa-sliders-h"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Settings Drawer -->
+    <div id="drawerBackdrop" class="drawer-backdrop" aria-hidden="true"></div>
+    <aside id="settingsDrawer" class="drawer" aria-hidden="true">
+      <div class="drawer-header">
+        <h2><i class="fas fa-cog"></i> Settings</h2>
+        <button id="settingsClose" class="btn-icon" title="Close">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label for="fieldWidth">Field Width:</label>
+          <input type="number" id="fieldWidth" min="10" max="120" value="50">
+        </div>
+        <div class="setting-item">
+          <label for="fieldHeight">Field Height:</label>
+          <input type="number" id="fieldHeight" min="10" max="120" value="50">
+        </div>
+        <div class="setting-item">
+          <label for="player1Name">Player 1 Name:</label>
+          <input type="text" id="player1Name" value="Player 1">
+        </div>
+        <div class="setting-item">
+          <label for="player2Name">Player 2 Name:</label>
+          <input type="text" id="player2Name" value="Player 2">
+        </div>
+        <div class="setting-item full-width">
+          <label for="startingCorner">Starting Corner (P1):</label>
+          <select id="startingCorner">
+            <option value="TL">Top-Left</option>
+            <option value="TR">Top-Right</option>
+            <option value="BL">Bottom-Left</option>
+            <option value="BR">Bottom-Right</option>
+          </select>
+        </div>
+      </div>
+    </aside>
+
+
+    <div class="game-layout">
+      <!-- Left panel: Game controls & info -->
+      <div class="left-panel">
+        <div class="panel-section">
+          <h2><i class="fas fa-chart-bar"></i> Game State</h2>
+          <div class="scoreboard">
+            <div class="score-item player1-score">
+              <span class="player-name" id="player1Display">Player 1</span>
+              <span class="player-count" id="score1">0</span>
+            </div>
+            <div class="score-item player2-score">
+              <span class="player-name" id="player2Display">Player 2</span>
+              <span class="player-count" id="score2">0</span>
+            </div>
+            <div class="score-item free-cells">
+              <span class="player-name">Free Cells</span>
+              <span class="player-count" id="freeCells">2500</span>
+            </div>
+          </div>
+          <div class="current-turn">
+            Current Turn: <span id="currentPlayerDisplay">Player 1</span>
+          </div>
+          <div class="game-status" id="gameStatus">Ready to start</div>
+        </div>
+
+        <div class="panel-section">
+          <h2><i class="fas fa-dice"></i> Dice & Actions</h2>
+          <div class="dice-container">
+            <div class="die" id="die1">
+              <div class="dot-container"></div>
+            </div>
+            <div class="die" id="die2">
+              <div class="dot-container"></div>
+            </div>
+          </div>
+          <div class="action-buttons">
+            <button id="rollBtn" class="btn btn-action" disabled>
+              <i class="fas fa-redo"></i> Roll Dice (R)
+            </button>
+            <button id="rotateBtn" class="btn btn-action" disabled>
+              <i class="fas fa-sync-alt"></i> Rotate (S)
+            </button>          </div>
+          <div class="kush-indicator" id="kushIndicator">
+            <i class="fas fa-crown"></i> KUSH MODE ACTIVE!
+          </div>
+        </div>
+      </div>
+
+
+      <!-- Main game canvas -->
+      <div class="game-area">
+        <div class="canvas-container">
+          <canvas id="gameCanvas"></canvas>
+          <div class="canvas-overlay" id="placementOverlay"></div>
+        </div>
+        <div class="canvas-controls">
+          <button id="zoomInBtn" class="btn-icon" title="Zoom In">
+            <i class="fas fa-search-plus"></i>
+          </button>
+          <button id="zoomOutBtn" class="btn-icon" title="Zoom Out">
+            <i class="fas fa-search-minus"></i>
+          </button>
+          <button id="centerViewBtn" class="btn-icon" title="Center View">
+            <i class="fas fa-crosshairs"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right panel: Game log & history -->
+      <div class="right-panel">
+        <div class="panel-section">
+          <h2><i class="fas fa-history"></i> Move History</h2>
+          <div class="log-controls">
+            <button id="exportBtn" class="btn btn-small">
+              <i class="fas fa-download"></i> Export
+            </button>
+            <button id="importBtn" class="btn btn-small">
+              <i class="fas fa-upload"></i> Import
+            </button>
+            <button id="clearLogBtn" class="btn btn-small">
+              <i class="fas fa-trash"></i> Clear
+            </button>
+          </div>
+          <div class="history-container">
+            <div class="history-list" id="historyList">
+              <!-- Move history will be populated here -->
+            </div>
+          </div>
+          <div class="replay-controls">
+            <button id="prevMoveBtn" class="btn-icon" disabled>
+              <i class="fas fa-step-backward"></i>
+            </button>
+            <input type="range" id="historySlider" min="0" max="0" value="0" disabled>
+            <button id="nextMoveBtn" class="btn-icon" disabled>
+              <i class="fas fa-step-forward"></i>
+            </button>
+            <button id="liveModeBtn" class="btn btn-small">
+              <i class="fas fa-play"></i> Live
+            </button>
+          </div>
+          <div class="replay-info">
+            Viewing: <span id="replayPosition">Live</span> of <span id="totalMoves">0</span> moves
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <h2><i class="fas fa-info-circle"></i> Game Rules</h2>
+          <div class="rules-list">
+            <div class="rule-item">
+              <i class="fas fa-dice"></i>
+              <span>Roll 2 dice to determine rectangle size (a×b or b×a)</span>
+            </div>
+            <div class="rule-item">
+              <i class="fas fa-vector-square"></i>
+              <span>Place rectangle adjacent to your territory (8-direction)</span>
+            </div>
+            <div class="rule-item">
+              <i class="fas fa-crown"></i>
+              <span><strong>KUSH</strong>: When dice are equal, place anywhere, overwriting opponents</span>
+            </div>
+            <div class="rule-item">
+              <i class="fas fa-draw-polygon"></i>
+              <span>After placement, enclosed areas become yours</span>
+            </div>
+            <div class="rule-item">
+              <i class="fas fa-flag-checkered"></i>
+              <span>Game ends when no free cells remain</span>
+            </div>
+          </div>
+          <div class="hotkeys-info">
+            <h3><i class="fas fa-keyboard"></i> Hotkeys</h3>
+            <div class="hotkey-item"><kbd>R</kbd> Roll Dice</div>
+            <div class="hotkey-item"><kbd>S</kbd> Rotate Rectangle</div>
+                        <div class="hotkey-item"><kbd>+</kbd> Zoom In</div>
+            <div class="hotkey-item"><kbd>-</kbd> Zoom Out</div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+
+  <!-- Import/Export Modal -->
+  <div id="importExportModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fas fa-file-export"></i> Import / Export Game</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-tabs">
+          <button class="tab-btn active" data-tab="export">Export</button>
+          <button class="tab-btn" data-tab="import">Import</button>
+        </div>
+        <div class="tab-content active" id="exportTab">
+          <p>Copy this JSON to save or share your game:</p>
+          <textarea id="exportTextarea" readonly rows="10"></textarea>
+          <button id="copyBtn" class="btn btn-primary">
+            <i class="fas fa-copy"></i> Copy to Clipboard
+          </button>
+        </div>
+        <div class="tab-content" id="importTab">
+          <p>Paste JSON to load a saved game:</p>
+          <textarea id="importTextarea" placeholder="Paste game JSON here..." rows="10"></textarea>
+          <button id="loadBtn" class="btn btn-primary">
+            <i class="fas fa-play"></i> Load Game
+          </button>
+          <div class="alert" id="importAlert"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
