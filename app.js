@@ -2127,13 +2127,57 @@ function exitReplayMode() {
   Game.historyHover = null;
   Game.historyPinned = null;
   
+  // Restore grid to latest state
   if (Game.moveHistory.length > 0) {
     const lastMove = Game.moveHistory[Game.moveHistory.length - 1];
     if (lastMove.gridSnapshot) {
       loadGridSnapshot(lastMove.gridSnapshot);
     }
-    Game.currentPlayer = lastMove.playerId === 1 ? 2 : 1;
+    
+    // Restore correct game state based on last move type
+    if (lastMove.type === 'placement' || lastMove.type === 'skip') {
+      // After placement/skip, it's the next player's turn and dice are not rolled
+      Game.currentPlayer = lastMove.playerId === 1 ? 2 : 1;
+      Game.diceRolled = false;
+      Game.isKush = false;
+      Game.diceValues = [1, 1];
+    } else if (lastMove.type === 'dice_roll') {
+      // After dice roll, same player needs to place
+      Game.currentPlayer = lastMove.playerId;
+      Game.diceRolled = true;
+      Game.isKush = lastMove.isKush || false;
+      Game.diceValues = [lastMove.dice1, lastMove.dice2];
+      
+      // Start KUSH animation if needed
+      if (Game.isKush) {
+        startKushAnimation();
+      }
+    }
+  } else {
+    // No moves yet, reset to initial state
+    Game.currentPlayer = 1;
+    Game.diceRolled = false;
+    Game.isKush = false;
+    Game.diceValues = [1, 1];
   }
+  
+  // Clear placement state
+  Game.rectanglePosition = { x: -1, y: -1 };
+  Game.isValidPlacement = false;
+  Game.rectangleOrientation = 0;
+  
+  // Stop any KUSH animation if not in KUSH mode
+  if (!Game.isKush) {
+    stopKushAnimation();
+  }
+  
+  // Update KUSH indicator
+  if (DOM.kushIndicator) {
+    DOM.kushIndicator.style.display = Game.isKush ? 'block' : 'none';
+  }
+  
+  // Update dice display
+  updateDiceDisplay();
   
   updateUI();
   renderGrid();
