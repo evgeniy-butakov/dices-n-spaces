@@ -422,7 +422,8 @@ function startNewGame(options = {}) {
 
   const {
     preserveHistory = false,
-    preserveReplay = false
+    preserveReplay = false,
+    skipStartingPositions = false
   } = options;
 
   
@@ -449,11 +450,13 @@ function startNewGame(options = {}) {
   Game.panOffset = { x: 0, y: 0 };
   
   initializeGrid();
-  setStartingPositions();
+  if (!skipStartingPositions) {
+    setStartingPositions();
+  }
   updateCanvasSize();
   updateUI();
   updateHistoryUI();
-  closeModal();
+  closeImportExportModal();
   updateDiceDisplay();
   
   logGameState("Game started");
@@ -1946,7 +1949,8 @@ function jumpToMove(index) {
   // IMPORTANT:
   // We must NOT clear moveHistory when resetting the board for replay,
   // otherwise navigation breaks.
-  startNewGame({ preserveHistory: true, preserveReplay: true });
+  // Also skip setting starting positions - we'll load from snapshot instead
+  startNewGame({ preserveHistory: true, preserveReplay: true, skipStartingPositions: true });
 
   // Apply grid snapshots up to requested position (fast + stable even if rules change)
   let lastSnapshot = null;
@@ -1956,6 +1960,9 @@ function jumpToMove(index) {
   }
   if (lastSnapshot) {
     loadGridSnapshot(lastSnapshot);
+  } else {
+    // If no snapshot found before this move, set starting positions
+    setStartingPositions();
   }
 
   // Restore "turn" meta state based on the last processed move
