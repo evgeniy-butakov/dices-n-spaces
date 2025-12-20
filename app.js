@@ -57,6 +57,20 @@ const Game = {
 };
 
 // ====================================================================
+// AI PLAYER STATE
+// ====================================================================
+
+const AIState = {
+  enabled: false,
+  player: null,
+  playerId: 2,
+  difficulty: 'easy',
+  isThinking: false
+};
+
+let gameAPI = null;
+
+// ====================================================================
 // DOM ELEMENTS
 // ====================================================================
 
@@ -147,6 +161,10 @@ function initializeGame() {
   
   // Инициализируем пустую сетку
   Game.grid = null;
+  
+  // Initialize AI
+  initializeGameAPI();
+  initAIUI();
   
   updateUI();
   
@@ -467,6 +485,9 @@ function startNewGame(options = {}) {
   if (DOM.gameStatus) {
     DOM.gameStatus.textContent = `${getCurrentPlayerName()}'s turn`;
   }
+  
+  // Check if AI should play (if AI is Player 1)
+  setTimeout(() => checkAITurn(), 100);
 }
 
 /**
@@ -742,7 +763,11 @@ function placeRectangle() {
   });
   
   checkGameOver();
-  switchPlayer();
+  
+  // Don't switch player if game is over
+  if (!Game.gameOver) {
+    switchPlayer();
+  }
   
   Game.diceRolled = false;
   Game.isKush = false;
@@ -1325,6 +1350,9 @@ function switchPlayer() {
   if (DOM.gameStatus) {
     DOM.gameStatus.textContent = `${getCurrentPlayerName()}'s turn`;
   }
+  
+  // Check if AI should play
+  checkAITurn();
 }
 
 /**
@@ -1355,12 +1383,20 @@ function autoSkipTurn(reason = 'no_moves') {
     DOM.kushIndicator.style.display = 'none';
   }
 
-  switchPlayer();
-  updateUI();
-  renderGrid();
+  // Check if game is over before switching
+  checkGameOver();
+  
+  if (!Game.gameOver) {
+    switchPlayer();
+    updateUI();
+    renderGrid();
 
-  if (DOM.gameStatus) {
-    DOM.gameStatus.textContent = `No valid moves for previous roll — ${getCurrentPlayerName()}'s turn`;
+    if (DOM.gameStatus) {
+      DOM.gameStatus.textContent = `No valid moves for previous roll — ${getCurrentPlayerName()}'s turn`;
+    }
+  } else {
+    updateUI();
+    renderGrid();
   }
 }
 
@@ -1375,18 +1411,32 @@ function skipTurn() {
  */
 function checkGameOver() {
   let emptyCount = 0;
+  let player1Count = 0;
+  let player2Count = 0;
   
   for (let y = 0; y < Game.height; y++) {
     for (let x = 0; x < Game.width; x++) {
-      if (Game.grid[y][x] === 0) emptyCount++;
+      const cell = Game.grid[y][x];
+      if (cell === 0) {
+        emptyCount++;
+      } else if (cell === 1) {
+        player1Count++;
+      } else if (cell === 2) {
+        player2Count++;
+      }
     }
   }
   
-  if (emptyCount === 0) {
+  console.log(`CheckGameOver: Empty=${emptyCount}, P1=${player1Count}, P2=${player2Count}`);
+  
+  // Game over if:
+  // 1. No empty cells left, OR
+  // 2. One player has captured everything (other player has 0 cells)
+  if (emptyCount === 0 || player1Count === 0 || player2Count === 0) {
     Game.gameOver = true;
     
-    const score1 = getPlayerCellCount(1);
-    const score2 = getPlayerCellCount(2);
+    const score1 = player1Count;
+    const score2 = player2Count;
     
     let winnerText;
     if (score1 > score2) {
@@ -1397,10 +1447,16 @@ function checkGameOver() {
       winnerText = "It's a tie!";
     }
     
-    console.log(`Game over! ${winnerText} (${score1} vs ${score2})`);
+    console.log(`🎮 GAME OVER! ${winnerText} (${score1} vs ${score2})`);
     
     if (DOM.gameStatus) {
       DOM.gameStatus.textContent = `Game Over! ${winnerText}`;
+    }
+    
+    // Disable AI when game ends
+    if (AIState.enabled) {
+      console.log('Game ended - stopping AI');
+      AIState.isThinking = false;
     }
     
     logGameState("Game over");
@@ -2687,6 +2743,153 @@ function onHistorySliderChange() {
   const value = parseInt(DOM.historySlider.value);
   if (value !== Game.replayPosition) {
     jumpToMove(value);
+  }
+}
+
+// ====================================================================
+// AI PLAYER FUNCTIONS
+// ====================================================================
+
+/**
+ * Initialize Game API for AI
+ */
+function initializeGameAPI() {
+  gameAPI = createGameAPI(Game, {
+    rollDice: rollDice,
+    placeRectangle: placeRectangle,
+    rotateRectangle: rotateRectangle,
+    skipTurn: skipTurn,
+    canPlaceRectangle: canPlaceRectangle
+  });
+  
+  console.log('Game API initialized for AI');
+}
+
+/**
+ * Enable AI player
+ */
+function enableAI(difficulty = 'easy', playerId = 2) {
+  AIState.enabled = true;
+  AIState.playerId = playerId;
+  AIState.difficulty = difficulty;
+  AIState.player = new AIPlayer(difficulty, playerId, {
+    moveDelay: 800,
+    thinkingDelay: 400
+  });
+  
+  console.log(`AI enabled: ${difficulty} difficulty, Player ${playerId}`);
+  
+  if (DOM.aiToggle) {
+    DOM.aiToggle.innerHTML = '<i class="fas fa-robot"></i> Disable AI';
+    DOM.aiToggle.classList.add('active');
+  }
+  
+  checkAITurn();
+}
+
+/**
+ * Disable AI player
+ */
+function disableAI() {
+  AIState.enabled = false;
+  AIState.player = null;
+  AIState.isThinking = false;
+  
+  console.log('AI disabled');
+  
+  if (DOM.aiToggle) {
+    DOM.aiToggle.innerHTML = '<i class="fas fa-robot"></i> Enable AI';
+    DOM.aiToggle.classList.remove('active');
+  }
+}
+
+/**
+ * Check if it's AI's turn and let AI play
+ */
+async function checkAITurn() {
+  if (!AIState.enabled || 
+      Game.gameOver || 
+      AIState.isThinking || 
+      Game.isReplayMode ||
+      Game.currentPlayer !== AIState.playerId) {
+    return;
+  }
+  
+  console.log('AI turn detected');
+  
+  AIState.isThinking = true;
+  disableUserInput();
+  
+  if (DOM.gameStatus) {
+    DOM.gameStatus.textContent = `AI (Player ${AIState.playerId}) is thinking...`;
+  }
+  
+  try {
+    const result = await AIState.player.takeTurn(gameAPI);
+    console.log('AI move completed:', result);
+  } catch (error) {
+    console.error('AI error:', error);
+  } finally {
+    AIState.isThinking = false;
+    enableUserInput();
+  }
+}
+
+/**
+ * Disable user input during AI turn
+ */
+function disableUserInput() {
+  if (DOM.rollBtn) DOM.rollBtn.disabled = true;
+  if (DOM.rotateBtn) DOM.rotateBtn.disabled = true;
+  if (Game.canvas) Game.canvas.style.pointerEvents = 'none';
+}
+
+/**
+ * Enable user input after AI turn
+ */
+function enableUserInput() {
+  updateUI();
+  if (Game.canvas) Game.canvas.style.pointerEvents = 'auto';
+}
+
+/**
+ * Initialize AI UI
+ */
+function initAIUI() {
+  DOM.aiToggle = document.getElementById('aiToggle');
+  DOM.aiDifficulty = document.getElementById('aiDifficulty');
+  DOM.aiPlayer = document.getElementById('aiPlayer');
+  
+  if (DOM.aiToggle) {
+    DOM.aiToggle.addEventListener('click', () => {
+      if (AIState.enabled) {
+        disableAI();
+      } else {
+        const difficulty = DOM.aiDifficulty?.value || 'easy';
+        const playerId = parseInt(DOM.aiPlayer?.value || '2');
+        enableAI(difficulty, playerId);
+      }
+    });
+  }
+  
+  if (DOM.aiDifficulty) {
+    DOM.aiDifficulty.addEventListener('change', (e) => {
+      if (AIState.enabled) {
+        const playerId = AIState.playerId;
+        disableAI();
+        enableAI(e.target.value, playerId);
+      }
+    });
+  }
+  
+  if (DOM.aiPlayer) {
+    DOM.aiPlayer.addEventListener('change', (e) => {
+      if (AIState.enabled) {
+        const difficulty = AIState.difficulty;
+        disableAI();
+        enableAI(difficulty, parseInt(e.target.value));
+      }
+    });
   }
 }
 

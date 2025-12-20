@@ -70,6 +70,33 @@
     <div class="game-layout">
       <!-- Left panel: Game controls & info -->
       <div class="left-panel">
+        <!-- AI Player Section -->
+        <div class="panel-section ai-section">
+          <h2><i class="fas fa-robot"></i> AI Player</h2>
+          <div class="ai-controls">
+            <button id="aiToggle" class="btn btn-ai">
+              <i class="fas fa-robot"></i> Enable AI
+            </button>
+            <div class="ai-options">
+              <label>
+                <span>Difficulty:</span>
+                <select id="aiDifficulty" class="ai-select">
+                  <option value="easy">Easy</option>
+                  <option value="medium" disabled>Medium (Soon)</option>
+                  <option value="hard" disabled>Hard (Soon)</option>
+                </select>
+              </label>
+              <label>
+                <span>AI Player:</span>
+                <select id="aiPlayer" class="ai-select">
+                  <option value="2">Player 2</option>
+                  <option value="1">Player 1</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        </div>
+        
         <div class="panel-section">
           <h2><i class="fas fa-chart-bar"></i> Game State</h2>
           <div class="scoreboard">
@@ -249,5 +276,6 @@
   </div>
 
   <script src="app.js"></script>
+  <script src="ai-player.js"></script>
 </body>
 </html>
