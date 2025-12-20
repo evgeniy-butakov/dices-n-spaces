@@ -41,6 +41,8 @@ const Game = {
   panOffset: { x: 0, y: 0 },
   isPanning: false,
   lastMousePos: { x: 0, y: 0 },
+  kushPulseTime: 0, // For KUSH preview pulsing animation
+  kushAnimationFrame: null, // Animation frame ID for cleanup
   
   // Colors
   colors: {
@@ -539,6 +541,13 @@ function rollDice() {
       DOM.kushIndicator.style.display = Game.isKush ? 'block' : 'none';
     }
     
+    // Start or stop KUSH pulsing animation
+    if (Game.isKush) {
+      startKushAnimation();
+    } else {
+      stopKushAnimation();
+    }
+    
     if (!Game.isKush && !hasValidPlacement()) {
       console.log("No valid moves found, auto-skipping turn");
       setTimeout(() => autoSkipTurn('no_moves'), 600);
@@ -739,6 +748,9 @@ function placeRectangle() {
   Game.isKush = false;
   Game.rectanglePosition = { x: -1, y: -1 };
   Game.isValidPlacement = false;
+  
+  // Stop KUSH animation
+  stopKushAnimation();
   
   if (DOM.kushIndicator) {
     DOM.kushIndicator.style.display = 'none';
@@ -1477,6 +1489,48 @@ function calculateCellSize() {
   console.log(`Cell size calculated: ${Game.cellSize}px (SQUARE, canvas: ${Game.canvas.width}x${Game.canvas.height}, grid: ${Game.width}x${Game.height})`);
 }
 
+// ====================================================================
+// KUSH ANIMATION
+// ====================================================================
+
+/**
+ * Start KUSH pulsing animation
+ * @function startKushAnimation
+ */
+function startKushAnimation() {
+  // Stop any existing animation
+  stopKushAnimation();
+  
+  // Reset pulse time
+  Game.kushPulseTime = 0;
+  
+  // Animation loop
+  function animate() {
+    Game.kushPulseTime += 16; // ~16ms per frame (60fps)
+    
+    // Only render if dice rolled and not in replay mode
+    if (Game.diceRolled && Game.isKush && !Game.isReplayMode) {
+      renderGrid();
+      Game.kushAnimationFrame = requestAnimationFrame(animate);
+    }
+  }
+  
+  // Start animation
+  Game.kushAnimationFrame = requestAnimationFrame(animate);
+}
+
+/**
+ * Stop KUSH pulsing animation
+ * @function stopKushAnimation
+ */
+function stopKushAnimation() {
+  if (Game.kushAnimationFrame) {
+    cancelAnimationFrame(Game.kushAnimationFrame);
+    Game.kushAnimationFrame = null;
+  }
+  Game.kushPulseTime = 0;
+}
+
 /**
  * Render the game grid
  * @function renderGrid
@@ -1555,32 +1609,57 @@ function renderGrid() {
     const previewWidth = dim.width * Game.cellSize * scale;
     const previewHeight = dim.height * Game.cellSize * scale;
 
-    // Neutral, non-misleading preview fill (always gray + transparent)
-    ctx.fillStyle = "rgba(148, 163, 184, 0.18)";
-    ctx.fillRect(screenX, screenY, previewWidth, previewHeight);
-
-    // Border color rules:
-    // - Default: gray translucent border
-    // - If preview touches CURRENT player's territory (8-neighborhood): border becomes player's color
-    // - Touching opponent's cells should NOT change border color
-    const touchesOwn = previewTouchesPlayer(gridX, gridY, dim.width, dim.height, Game.currentPlayer);
-    const playerBorder = Game.currentPlayer === 1 ? Game.colors.player1 : Game.colors.player2;
-    const neutralBorder = "rgba(148, 163, 184, 0.9)";
-
-    ctx.save();
-
-    // If placement is not currently valid, use dashed border (but keep neutral/player color)
-    if (!Game.isValidPlacement) {
-      ctx.setLineDash([6, 4]);
-    } else {
+    // KUSH MODE: Pulsing player color preview
+    if (Game.isKush) {
+      // Calculate pulsing alpha (0.2 to 0.5)
+      const pulseAlpha = 0.2 + 0.3 * (0.5 + 0.5 * Math.sin(Game.kushPulseTime * 0.003));
+      
+      // Get player color
+      const playerColor = Game.currentPlayer === 1 ? Game.colors.player1 : Game.colors.player2;
+      
+      // Parse hex color to RGB
+      const r = parseInt(playerColor.slice(1, 3), 16);
+      const g = parseInt(playerColor.slice(3, 5), 16);
+      const b = parseInt(playerColor.slice(5, 7), 16);
+      
+      // Fill with pulsing player color
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${pulseAlpha})`;
+      ctx.fillRect(screenX, screenY, previewWidth, previewHeight);
+      
+      // Border: solid player color, also pulsing
+      const borderAlpha = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(Game.kushPulseTime * 0.003));
+      ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${borderAlpha})`;
+      ctx.lineWidth = 3;
       ctx.setLineDash([]);
+      ctx.strokeRect(screenX, screenY, previewWidth, previewHeight);
+    } else {
+      // NORMAL MODE: Neutral, non-misleading preview fill (always gray + transparent)
+      ctx.fillStyle = "rgba(148, 163, 184, 0.18)";
+      ctx.fillRect(screenX, screenY, previewWidth, previewHeight);
+
+      // Border color rules:
+      // - Default: gray translucent border
+      // - If preview touches CURRENT player's territory (8-neighborhood): border becomes player's color
+      // - Touching opponent's cells should NOT change border color
+      const touchesOwn = previewTouchesPlayer(gridX, gridY, dim.width, dim.height, Game.currentPlayer);
+      const playerBorder = Game.currentPlayer === 1 ? Game.colors.player1 : Game.colors.player2;
+      const neutralBorder = "rgba(148, 163, 184, 0.9)";
+
+      ctx.save();
+
+      // If placement is not currently valid, use dashed border (but keep neutral/player color)
+      if (!Game.isValidPlacement) {
+        ctx.setLineDash([6, 4]);
+      } else {
+        ctx.setLineDash([]);
+      }
+
+      ctx.strokeStyle = touchesOwn ? playerBorder : neutralBorder;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(screenX, screenY, previewWidth, previewHeight);
+
+      ctx.restore();
     }
-
-    ctx.strokeStyle = touchesOwn ? playerBorder : neutralBorder;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(screenX, screenY, previewWidth, previewHeight);
-
-    ctx.restore();
   }
 
 
