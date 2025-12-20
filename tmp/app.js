@@ -22,6 +22,8 @@ const Game = {
   gameOver: false,
   isReplayMode: false,
   replayPosition: 0,
+  historyHover: null, // {index, rect:{x,y,width,height}} transient hover highlight from history
+  historyPinned: null, // {index, rect:{x,y,width,height}} pinned highlight (toggle on click)
   
   // Players
   player1Name: "Player 1",
@@ -74,9 +76,9 @@ const DOM = {
   
   // Buttons
   newGameBtn: null,
+  rulesBtn: null,
   rollBtn: null,
   rotateBtn: null,
-  skipBtn: null,
   exportBtn: null,
   importBtn: null,
   clearLogBtn: null,
@@ -86,6 +88,12 @@ const DOM = {
   zoomInBtn: null,
   zoomOutBtn: null,
   centerViewBtn: null,
+
+  // Settings drawer
+  settingsToggle: null,
+  settingsDrawer: null,
+  drawerBackdrop: null,
+  settingsClose: null,
   
   // Game state displays
   player1Display: null,
@@ -108,13 +116,15 @@ const DOM = {
   totalMoves: null,
   
   // Modal
+  rulesModal: null,
+  rulesModalClose: null,
   importExportModal: null,
+  importExportModalClose: null,
   exportTextarea: null,
   importTextarea: null,
   copyBtn: null,
   loadBtn: null,
   importAlert: null,
-  modalClose: null,
   tabBtns: null
 };
 
@@ -166,9 +176,9 @@ function setupDOMReferences() {
   
   // Buttons
   DOM.newGameBtn = document.getElementById('newGameBtn');
+  DOM.rulesBtn = document.getElementById('rulesBtn');
   DOM.rollBtn = document.getElementById('rollBtn');
   DOM.rotateBtn = document.getElementById('rotateBtn');
-  DOM.skipBtn = document.getElementById('skipBtn');
   DOM.exportBtn = document.getElementById('exportBtn');
   DOM.importBtn = document.getElementById('importBtn');
   DOM.clearLogBtn = document.getElementById('clearLogBtn');
@@ -178,6 +188,12 @@ function setupDOMReferences() {
   DOM.zoomInBtn = document.getElementById('zoomInBtn');
   DOM.zoomOutBtn = document.getElementById('zoomOutBtn');
   DOM.centerViewBtn = document.getElementById('centerViewBtn');
+  
+  // Settings drawer
+  DOM.settingsToggle = document.getElementById('settingsToggle');
+  DOM.settingsDrawer = document.getElementById('settingsDrawer');
+  DOM.drawerBackdrop = document.getElementById('drawerBackdrop');
+  DOM.settingsClose = document.getElementById('settingsClose');
   
   // Game state displays
   DOM.player1Display = document.getElementById('player1Display');
@@ -200,13 +216,15 @@ function setupDOMReferences() {
   DOM.totalMoves = document.getElementById('totalMoves');
   
   // Modal
+  DOM.rulesModal = document.getElementById('rulesModal');
+  DOM.rulesModalClose = document.getElementById('rulesModalClose');
   DOM.importExportModal = document.getElementById('importExportModal');
+  DOM.importExportModalClose = document.getElementById('importExportModalClose');
   DOM.exportTextarea = document.getElementById('exportTextarea');
   DOM.importTextarea = document.getElementById('importTextarea');
   DOM.copyBtn = document.getElementById('copyBtn');
   DOM.loadBtn = document.getElementById('loadBtn');
   DOM.importAlert = document.getElementById('importAlert');
-  DOM.modalClose = document.querySelector('.modal-close');
   DOM.tabBtns = document.querySelectorAll('.tab-btn');
   
   console.log("DOM references set up");
@@ -259,8 +277,6 @@ function setupEventListeners() {
   
   if (DOM.rollBtn) DOM.rollBtn.addEventListener('click', rollDice);
   if (DOM.rotateBtn) DOM.rotateBtn.addEventListener('click', rotateRectangle);
-  if (DOM.skipBtn) DOM.skipBtn.addEventListener('click', skipTurn);
-  
   // History controls
   if (DOM.exportBtn) DOM.exportBtn.addEventListener('click', openExportModal);
   if (DOM.importBtn) DOM.importBtn.addEventListener('click', openImportModal);
@@ -270,6 +286,14 @@ function setupEventListeners() {
   if (DOM.liveModeBtn) DOM.liveModeBtn.addEventListener('click', exitReplayMode);
   if (DOM.historySlider) DOM.historySlider.addEventListener('input', onHistorySliderChange);
   
+  // Settings drawer
+  if (DOM.settingsToggle) DOM.settingsToggle.addEventListener('click', openSettingsDrawer);
+  if (DOM.settingsClose) DOM.settingsClose.addEventListener('click', closeSettingsDrawer);
+  if (DOM.drawerBackdrop) DOM.drawerBackdrop.addEventListener('click', closeSettingsDrawer);
+  
+  // Rules button
+  if (DOM.rulesBtn) DOM.rulesBtn.addEventListener('click', openRulesModal);
+
   // Canvas controls
   if (DOM.zoomInBtn) DOM.zoomInBtn.addEventListener('click', () => changeZoom(0.2));
   if (DOM.zoomOutBtn) DOM.zoomOutBtn.addEventListener('click', () => changeZoom(-0.2));
@@ -280,12 +304,16 @@ function setupEventListeners() {
     Game.canvas.addEventListener('mousedown', startPan);
     Game.canvas.addEventListener('mousemove', handleMouseMove);
     Game.canvas.addEventListener('mouseup', stopPan);
-    Game.canvas.addEventListener('wheel', handleZoom);
+    // Disable trackpad / wheel zooming the game (but keep page scroll). Prevent browser pinch-zoom over canvas.
+    Game.canvas.addEventListener('wheel', (e) => {
+      if (e.ctrlKey || e.metaKey) e.preventDefault();
+    }, { passive: false });
     Game.canvas.addEventListener('click', handleCanvasClick);
   }
   
   // Modal controls
-  if (DOM.modalClose) DOM.modalClose.addEventListener('click', closeModal);
+  if (DOM.rulesModalClose) DOM.rulesModalClose.addEventListener('click', closeRulesModal);
+  if (DOM.importExportModalClose) DOM.importExportModalClose.addEventListener('click', closeImportExportModal);
   if (DOM.copyBtn) DOM.copyBtn.addEventListener('click', copyExportText);
   if (DOM.loadBtn) DOM.loadBtn.addEventListener('click', importGame);
   
@@ -387,10 +415,16 @@ function initializeGrid() {
  * Start a new game with current settings
  * @function startNewGame
  */
-function startNewGame() {
+function startNewGame(options = {}) {
   console.log("Starting new game...");
   
   loadSettings();
+
+  const {
+    preserveHistory = false,
+    preserveReplay = false
+  } = options;
+
   
   Game.currentPlayer = 1;
   Game.diceValues = [1, 1];
@@ -400,10 +434,17 @@ function startNewGame() {
   Game.rectanglePosition = { x: -1, y: -1 };
   Game.isValidPlacement = false;
   Game.gameOver = false;
-  Game.isReplayMode = false;
-  Game.replayPosition = 0;
-  Game.moveHistory = [];
-  Game.currentMoveIndex = 0;
+  // Clear any history highlight overlays
+  Game.historyHover = null;
+  Game.historyPinned = null;
+  if (!preserveReplay) {
+    Game.isReplayMode = false;
+    Game.replayPosition = 0;
+  }
+  if (!preserveHistory) {
+    Game.moveHistory = [];
+    Game.currentMoveIndex = 0;
+  }
   Game.zoomLevel = 1;
   Game.panOffset = { x: 0, y: 0 };
   
@@ -497,7 +538,7 @@ function rollDice() {
     
     if (!Game.isKush && !hasValidPlacement()) {
       console.log("No valid moves found, auto-skipping turn");
-      setTimeout(skipTurn, 1000);
+      setTimeout(() => autoSkipTurn('no_moves'), 600);
       if (DOM.gameStatus) {
         DOM.gameStatus.textContent = "No valid moves - skipping turn";
       }
@@ -776,112 +817,284 @@ function hasValidPlacement() {
  */
 function captureContours() {
   const player = Game.currentPlayer;
+  const W = Game.width;
+  const H = Game.height;
+
   let totalCaptured = 0;
-  
-  console.log(`Capturing contours for player ${player}...`);
-  
-  // Алгоритм: расширяем поле виртуальной границей и используем BFS
-  // для нахождения всех клеток, достижимых извне
-  
-  // Размеры расширенного поля (добавляем границу вокруг)
-  const expandedWidth = Game.width + 2;
-  const expandedHeight = Game.height + 2;
-  
-  // Массив для отметки клеток игрока как "стен"
-  const isWall = Array(expandedHeight).fill().map(() => Array(expandedWidth).fill(false));
-  
-  // Копируем игровое поле в центр расширенного
-  for (let y = 0; y < Game.height; y++) {
-    for (let x = 0; x < Game.width; x++) {
+
+  // ------------------------------------------------------------------
+  // Build "walls" map on an expanded field (1-cell border around)
+  // Walls are:
+  //   - current player's cells
+  //   - selected segments of the field border (virtual walls) to support
+  //     contour closure via 1 side ("П") or 2 sides (corner), per spec.
+  // Then we flood-fill "outside air" from (0,0) on the expanded field.
+  // Everything NOT reachable from outside is "inside" and gets captured.
+  // ------------------------------------------------------------------
+
+  const expandedWidth = W + 2;
+  const expandedHeight = H + 2;
+
+  const isWall = Array.from({ length: expandedHeight }, () => Array(expandedWidth).fill(false));
+
+  // Mark player's cells as walls
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
       if (Game.grid[y][x] === player) {
         isWall[y + 1][x + 1] = true;
       }
     }
   }
-  
-  // Отмечаем всю внешнюю границу как доступную (не стену)
-  // Но это не делает ее стеной - она проходима
-  for (let x = 0; x < expandedWidth; x++) {
-    isWall[0][x] = false;
-    isWall[expandedHeight - 1][x] = false;
-  }
-  for (let y = 0; y < expandedHeight; y++) {
-    isWall[y][0] = false;
-    isWall[y][expandedWidth - 1] = false;
-  }
-  
-  // Массив для отметки посещенных клеток в BFS
-  const visited = Array(expandedHeight).fill().map(() => Array(expandedWidth).fill(false));
-  
-  // Очередь для BFS - начинаем с угла расширенного поля
-  const queue = [{ x: 0, y: 0 }];
-  visited[0][0] = true;
-  
-  const directions = [
+
+  // --------------------------------------------------------------
+  // Virtual border walls (important!)
+  // We do NOT make the whole border a wall (it would capture all).
+  // Instead we add ONLY the border segments that are needed to close
+  // a contour which "leans" on the border:
+  //   - Component touches the same side in 2+ positions: close between
+  //     min..max touch on that side ("П" closure).
+  //   - Component touches 2 adjacent sides: close from the nearest touch
+  //     points to the corner (corner closure).
+  // --------------------------------------------------------------
+  (function addVirtualBorderWalls() {
+    const visited = Array.from({ length: H }, () => Array(W).fill(false));
+
+    // IMPORTANT: for border-based closures ("П" and corner),
+// we treat player's territory connectivity as 8-connected.
+// This matches the game's adjacency rule (touching corners counts) and
+// prevents missing closures when pieces meet diagonally.
+const dirs8 = [
+      { dx: 1, dy: 0 }, { dx: -1, dy: 0 },
+      { dx: 0, dy: 1 }, { dx: 0, dy: -1 },
+      { dx: 1, dy: 1 }, { dx: 1, dy: -1 },
+      { dx: -1, dy: 1 }, { dx: -1, dy: -1 }
+    ];
+
+    function bfsComponent(sx, sy) {
+      const qx = [sx];
+      const qy = [sy];
+      visited[sy][sx] = true;
+
+      // Touch ranges (in original coordinates)
+      let topMin = Infinity, topMax = -Infinity, topCount = 0;
+      let bottomMin = Infinity, bottomMax = -Infinity, bottomCount = 0;
+      let leftMin = Infinity, leftMax = -Infinity, leftCount = 0;
+      let rightMin = Infinity, rightMax = -Infinity, rightCount = 0;
+
+      while (qx.length) {
+        const x = qx.pop();
+        const y = qy.pop();
+
+        // Side touches
+        if (y === 0) { topMin = Math.min(topMin, x); topMax = Math.max(topMax, x); topCount++; }
+        if (y === H - 1) { bottomMin = Math.min(bottomMin, x); bottomMax = Math.max(bottomMax, x); bottomCount++; }
+        if (x === 0) { leftMin = Math.min(leftMin, y); leftMax = Math.max(leftMax, y); leftCount++; }
+        if (x === W - 1) { rightMin = Math.min(rightMin, y); rightMax = Math.max(rightMax, y); rightCount++; }
+
+        for (const d of dirs8) {
+          const nx = x + d.dx;
+          const ny = y + d.dy;
+          if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+          if (visited[ny][nx]) continue;
+          if (Game.grid[ny][nx] !== player) continue;
+          visited[ny][nx] = true;
+          qx.push(nx);
+          qy.push(ny);
+        }
+      }
+
+      return {
+        top: { min: topMin, max: topMax, count: topCount },
+        bottom: { min: bottomMin, max: bottomMax, count: bottomCount },
+        left: { min: leftMin, max: leftMax, count: leftCount },
+        right: { min: rightMin, max: rightMax, count: rightCount }
+      };
+    }
+
+    function wallTop(fromX, toX) {
+      const a = Math.max(0, Math.min(fromX, toX));
+      const b = Math.min(W - 1, Math.max(fromX, toX));
+      for (let x = a; x <= b; x++) {
+        const ex = x + 1;
+        // Keep (0,0) outside start cell open; do not matter for ex>=1 anyway
+        isWall[0][ex] = true;
+      }
+    }
+
+    function wallBottom(fromX, toX) {
+      const a = Math.max(0, Math.min(fromX, toX));
+      const b = Math.min(W - 1, Math.max(fromX, toX));
+      for (let x = a; x <= b; x++) {
+        const ex = x + 1;
+        isWall[H + 1][ex] = true;
+      }
+    }
+
+    function wallLeft(fromY, toY) {
+      const a = Math.max(0, Math.min(fromY, toY));
+      const b = Math.min(H - 1, Math.max(fromY, toY));
+      for (let y = a; y <= b; y++) {
+        const ey = y + 1;
+        isWall[ey][0] = true;
+      }
+    }
+
+    function wallRight(fromY, toY) {
+      const a = Math.max(0, Math.min(fromY, toY));
+      const b = Math.min(H - 1, Math.max(fromY, toY));
+      for (let y = a; y <= b; y++) {
+        const ey = y + 1;
+        isWall[ey][W + 1] = true;
+      }
+    }
+
+    // Process each connected component of player's cells
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        if (Game.grid[y][x] !== player || visited[y][x]) continue;
+
+        const touches = bfsComponent(x, y);
+
+        // "П" closures: same side touched 2+ times => close min..max on that side
+        if (touches.top.count >= 2) wallTop(touches.top.min, touches.top.max);
+        if (touches.bottom.count >= 2) wallBottom(touches.bottom.min, touches.bottom.max);
+        if (touches.left.count >= 2) wallLeft(touches.left.min, touches.left.max);
+        if (touches.right.count >= 2) wallRight(touches.right.min, touches.right.max);
+
+        // Corner closures: component touches two adjacent sides.
+        // IMPORTANT: to avoid accidental full-border sealing (and "capture all")
+        // we must not allow ONE single touch on a side to be used to close to
+        // BOTH corners on that side.
+        let canTL = touches.top.count >= 1 && touches.left.count >= 1;
+        let canTR = touches.top.count >= 1 && touches.right.count >= 1;
+        let canBL = touches.bottom.count >= 1 && touches.left.count >= 1;
+        let canBR = touches.bottom.count >= 1 && touches.right.count >= 1;
+
+        // Resolve conflicts for TOP side (single top touch used by TL+TR)
+        if (touches.top.count === 1 && canTL && canTR) {
+          const xTop = touches.top.min; // == max
+          const scoreTL = xTop + touches.left.min;
+          const scoreTR = (W - 1 - xTop) + touches.right.min;
+          if (scoreTL <= scoreTR) canTR = false; else canTL = false;
+        }
+        // Resolve conflicts for BOTTOM side (single bottom touch used by BL+BR)
+        if (touches.bottom.count === 1 && canBL && canBR) {
+          const xBot = touches.bottom.min;
+          const scoreBL = xBot + (H - 1 - touches.left.max);
+          const scoreBR = (W - 1 - xBot) + (H - 1 - touches.right.max);
+          if (scoreBL <= scoreBR) canBR = false; else canBL = false;
+        }
+        // Resolve conflicts for LEFT side (single left touch used by TL+BL)
+        if (touches.left.count === 1 && canTL && canBL) {
+          const yLeft = touches.left.min;
+          const scoreTL = yLeft + touches.top.min;
+          const scoreBL = (H - 1 - yLeft) + touches.bottom.min;
+          if (scoreTL <= scoreBL) canBL = false; else canTL = false;
+        }
+        // Resolve conflicts for RIGHT side (single right touch used by TR+BR)
+        if (touches.right.count === 1 && canTR && canBR) {
+          const yRight = touches.right.min;
+          const scoreTR = yRight + (W - 1 - touches.top.max);
+          const scoreBR = (H - 1 - yRight) + (W - 1 - touches.bottom.max);
+          if (scoreTR <= scoreBR) canBR = false; else canTR = false;
+        }
+
+        // Apply the selected corner closures
+        if (canTL) {
+          wallTop(0, touches.top.min);
+          wallLeft(0, touches.left.min);
+        }
+        if (canTR) {
+          wallTop(touches.top.max, W - 1);
+          wallRight(0, touches.right.min);
+        }
+        if (canBL) {
+          wallBottom(0, touches.bottom.min);
+          wallLeft(touches.left.max, H - 1);
+        }
+        if (canBR) {
+          wallBottom(touches.bottom.max, W - 1);
+          wallRight(touches.right.max, H - 1);
+        }
+      }
+    }
+
+    // IMPORTANT: never block the BFS start cell (0,0)
+    isWall[0][0] = false;
+  })();
+
+  // --------------------------------------------------------------
+  // Flood-fill outside air on expanded grid (4-neighborhood)
+  // --------------------------------------------------------------
+  const visitedAir = Array.from({ length: expandedHeight }, () => Array(expandedWidth).fill(false));
+
+  // Queue implemented with arrays + head index (fast)
+  const qx = new Int32Array(expandedWidth * expandedHeight);
+  const qy = new Int32Array(expandedWidth * expandedHeight);
+  let qh = 0, qt = 0;
+
+  // Seed flood-fill from ALL border cells of the expanded grid.
+// This prevents the "first move in corner captures the whole field" bug,
+// because local walls near (0,0) cannot block the entire outside.
+function enqueueBorderCell(bx, by) {
+  if (bx < 0 || bx >= expandedWidth || by < 0 || by >= expandedHeight) return;
+  if (visitedAir[by][bx]) return;
+  if (isWall[by][bx]) return;
+  visitedAir[by][bx] = true;
+  qx[qt] = bx;
+  qy[qt] = by;
+  qt++;
+}
+
+for (let x = 0; x < expandedWidth; x++) {
+  enqueueBorderCell(x, 0);
+  enqueueBorderCell(x, expandedHeight - 1);
+}
+for (let y = 0; y < expandedHeight; y++) {
+  enqueueBorderCell(0, y);
+  enqueueBorderCell(expandedWidth - 1, y);
+}
+
+const dirs4 = [
     { dx: 1, dy: 0 }, { dx: -1, dy: 0 },
     { dx: 0, dy: 1 }, { dx: 0, dy: -1 }
   ];
-  
-  // BFS для нахождения всех клеток, достижимых извне
-  while (queue.length > 0) {
-    const { x, y } = queue.shift();
-    
-    for (const dir of directions) {
-      const nx = x + dir.dx;
-      const ny = y + dir.dy;
-      
-      if (nx >= 0 && nx < expandedWidth && ny >= 0 && ny < expandedHeight) {
-        if (!visited[ny][nx] && !isWall[ny][nx]) {
-          visited[ny][nx] = true;
-          queue.push({ x: nx, y: ny });
-        }
-      }
+
+  while (qh < qt) {
+    const x = qx[qh];
+    const y = qy[qh];
+    qh++;
+
+    for (const d of dirs4) {
+      const nx = x + d.dx;
+      const ny = y + d.dy;
+      if (nx < 0 || nx >= expandedWidth || ny < 0 || ny >= expandedHeight) continue;
+      if (visitedAir[ny][nx]) continue;
+      if (isWall[ny][nx]) continue;
+      visitedAir[ny][nx] = true;
+      qx[qt] = nx; qy[qt] = ny; qt++;
     }
   }
-  
-  // Теперь все клетки, которые не посещены и не являются стенами,
-  // находятся внутри контура и должны быть захвачены
-  
-  // Создаем копию сетки для применения изменений
-  const newGrid = [];
-  for (let y = 0; y < Game.height; y++) {
-    newGrid[y] = [...Game.grid[y]];
-  }
-  
-  // Захватываем клетки
-  for (let y = 0; y < Game.height; y++) {
-    for (let x = 0; x < Game.width; x++) {
-      // Координаты в расширенном поле
+
+  // --------------------------------------------------------------
+  // Capture: any original cell (x,y) whose expanded (x+1,y+1) is NOT
+  // reachable from outside => inside of a contour => becomes player.
+  // --------------------------------------------------------------
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
       const ex = x + 1;
       const ey = y + 1;
-      
-      // Если клетка не посещена в BFS (не достижима извне)
-      if (!visited[ey][ex]) {
-        // Захватываем пустые клетки и клетки противника
-        if (Game.grid[y][x] === 0 || Game.grid[y][x] !== player) {
-          newGrid[y][x] = player;
-          totalCaptured++;
-          
-          if (Game.grid[y][x] === 0) {
-            console.log(`  Captured empty cell at (${x}, ${y})`);
-          } else {
-            console.log(`  Captured opponent cell at (${x}, ${y}) from player ${Game.grid[y][x]}`);
-          }
-        }
+
+      if (!visitedAir[ey][ex] && Game.grid[y][x] !== player) {
+        Game.grid[y][x] = player;
+        totalCaptured++;
       }
     }
   }
-  
-  // Применяем изменения к основной сетке
-  for (let y = 0; y < Game.height; y++) {
-    for (let x = 0; x < Game.width; x++) {
-      Game.grid[y][x] = newGrid[y][x];
-    }
-  }
-  
-  console.log(`Total captured: ${totalCaptured} cells`);
+
   return totalCaptured;
 }
+
 
 // ====================================================================
 // УТИЛИТА ДЛЯ ОТЛАДКИ ЗАХВАТА
@@ -918,71 +1131,169 @@ function debugCapture() {
  */
 function captureContoursDebug() {
   const player = Game.currentPlayer;
+  const W = Game.width;
+  const H = Game.height;
+
   let totalCaptured = 0;
-  
-  // Упрощенная версия для отладки
-  const expandedWidth = Game.width + 2;
-  const expandedHeight = Game.height + 2;
-  
-  const isWall = Array(expandedHeight).fill().map(() => Array(expandedWidth).fill(false));
-  
-  for (let y = 0; y < Game.height; y++) {
-    for (let x = 0; x < Game.width; x++) {
+
+  const expandedWidth = W + 2;
+  const expandedHeight = H + 2;
+
+  const isWall = Array.from({ length: expandedHeight }, () => Array(expandedWidth).fill(false));
+
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
       if (Game.grid[y][x] === player) {
         isWall[y + 1][x + 1] = true;
       }
     }
   }
-  
-  for (let x = 0; x < expandedWidth; x++) {
-    isWall[0][x] = false;
-    isWall[expandedHeight - 1][x] = false;
-  }
-  for (let y = 0; y < expandedHeight; y++) {
-    isWall[y][0] = false;
-    isWall[y][expandedWidth - 1] = false;
-  }
-  
-  const visited = Array(expandedHeight).fill().map(() => Array(expandedWidth).fill(false));
-  const queue = [{ x: 0, y: 0 }];
-  visited[0][0] = true;
-  
-  const directions = [
+
+  // Same virtual border walls as in captureContours(), but without modifying grid
+  (function addVirtualBorderWalls() {
+    const visited = Array.from({ length: H }, () => Array(W).fill(false));
+    const dirs4 = [
+      { dx: 1, dy: 0 }, { dx: -1, dy: 0 },
+      { dx: 0, dy: 1 }, { dx: 0, dy: -1 }
+    ];
+
+    function bfsComponent(sx, sy) {
+      const qx = [sx];
+      const qy = [sy];
+      visited[sy][sx] = true;
+
+      let topMin = Infinity, topMax = -Infinity, topCount = 0;
+      let bottomMin = Infinity, bottomMax = -Infinity, bottomCount = 0;
+      let leftMin = Infinity, leftMax = -Infinity, leftCount = 0;
+      let rightMin = Infinity, rightMax = -Infinity, rightCount = 0;
+
+      while (qx.length) {
+        const x = qx.pop();
+        const y = qy.pop();
+
+        if (y === 0) { topMin = Math.min(topMin, x); topMax = Math.max(topMax, x); topCount++; }
+        if (y === H - 1) { bottomMin = Math.min(bottomMin, x); bottomMax = Math.max(bottomMax, x); bottomCount++; }
+        if (x === 0) { leftMin = Math.min(leftMin, y); leftMax = Math.max(leftMax, y); leftCount++; }
+        if (x === W - 1) { rightMin = Math.min(rightMin, y); rightMax = Math.max(rightMax, y); rightCount++; }
+
+        for (const d of dirs4) {
+          const nx = x + d.dx;
+          const ny = y + d.dy;
+          if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+          if (visited[ny][nx]) continue;
+          if (Game.grid[ny][nx] !== player) continue;
+          visited[ny][nx] = true;
+          qx.push(nx);
+          qy.push(ny);
+        }
+      }
+
+      return {
+        top: { min: topMin, max: topMax, count: topCount },
+        bottom: { min: bottomMin, max: bottomMax, count: bottomCount },
+        left: { min: leftMin, max: leftMax, count: leftCount },
+        right: { min: rightMin, max: rightMax, count: rightCount }
+      };
+    }
+
+    function wallTop(fromX, toX) {
+      const a = Math.max(0, Math.min(fromX, toX));
+      const b = Math.min(W - 1, Math.max(fromX, toX));
+      for (let x = a; x <= b; x++) isWall[0][x + 1] = true;
+    }
+    function wallBottom(fromX, toX) {
+      const a = Math.max(0, Math.min(fromX, toX));
+      const b = Math.min(W - 1, Math.max(fromX, toX));
+      for (let x = a; x <= b; x++) isWall[H + 1][x + 1] = true;
+    }
+    function wallLeft(fromY, toY) {
+      const a = Math.max(0, Math.min(fromY, toY));
+      const b = Math.min(H - 1, Math.max(fromY, toY));
+      for (let y = a; y <= b; y++) isWall[y + 1][0] = true;
+    }
+    function wallRight(fromY, toY) {
+      const a = Math.max(0, Math.min(fromY, toY));
+      const b = Math.min(H - 1, Math.max(fromY, toY));
+      for (let y = a; y <= b; y++) isWall[y + 1][W + 1] = true;
+    }
+
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        if (Game.grid[y][x] !== player || visited[y][x]) continue;
+
+        const t = bfsComponent(x, y);
+
+        if (t.top.count >= 2) wallTop(t.top.min, t.top.max);
+        if (t.bottom.count >= 2) wallBottom(t.bottom.min, t.bottom.max);
+        if (t.left.count >= 2) wallLeft(t.left.min, t.left.max);
+        if (t.right.count >= 2) wallRight(t.right.min, t.right.max);
+
+        if (t.top.count >= 1 && t.left.count >= 1) { wallTop(0, t.top.min); wallLeft(0, t.left.min); }
+        if (t.top.count >= 1 && t.right.count >= 1) { wallTop(t.top.max, W - 1); wallRight(0, t.right.min); }
+        if (t.bottom.count >= 1 && t.left.count >= 1) { wallBottom(0, t.bottom.min); wallLeft(t.left.max, H - 1); }
+        if (t.bottom.count >= 1 && t.right.count >= 1) { wallBottom(t.bottom.max, W - 1); wallRight(t.right.max, H - 1); }
+      }
+    }
+
+    isWall[0][0] = false;
+  })();
+
+  const visitedAir = Array.from({ length: expandedHeight }, () => Array(expandedWidth).fill(false));
+
+  const qx = new Int32Array(expandedWidth * expandedHeight);
+  const qy = new Int32Array(expandedWidth * expandedHeight);
+  let qh = 0, qt = 0;
+
+  // Seed flood-fill from ALL border cells of the expanded grid.
+function enqueueBorderCell(bx, by) {
+  if (bx < 0 || bx >= expandedWidth || by < 0 || by >= expandedHeight) return;
+  if (visitedAir[by][bx]) return;
+  if (isWall[by][bx]) return;
+  visitedAir[by][bx] = true;
+  qx[qt] = bx; qy[qt] = by; qt++;
+}
+
+for (let x = 0; x < expandedWidth; x++) {
+  enqueueBorderCell(x, 0);
+  enqueueBorderCell(x, expandedHeight - 1);
+}
+for (let y = 0; y < expandedHeight; y++) {
+  enqueueBorderCell(0, y);
+  enqueueBorderCell(expandedWidth - 1, y);
+}
+
+const dirs4 = [
     { dx: 1, dy: 0 }, { dx: -1, dy: 0 },
     { dx: 0, dy: 1 }, { dx: 0, dy: -1 }
   ];
-  
-  while (queue.length > 0) {
-    const { x, y } = queue.shift();
-    
-    for (const dir of directions) {
-      const nx = x + dir.dx;
-      const ny = y + dir.dy;
-      
-      if (nx >= 0 && nx < expandedWidth && ny >= 0 && ny < expandedHeight) {
-        if (!visited[ny][nx] && !isWall[ny][nx]) {
-          visited[ny][nx] = true;
-          queue.push({ x: nx, y: ny });
-        }
+
+  while (qh < qt) {
+    const x = qx[qh];
+    const y = qy[qh];
+    qh++;
+
+    for (const d of dirs4) {
+      const nx = x + d.dx;
+      const ny = y + d.dy;
+      if (nx < 0 || nx >= expandedWidth || ny < 0 || ny >= expandedHeight) continue;
+      if (visitedAir[ny][nx]) continue;
+      if (isWall[ny][nx]) continue;
+      visitedAir[ny][nx] = true;
+      qx[qt] = nx; qy[qt] = ny; qt++;
+    }
+  }
+
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (!visitedAir[y + 1][x + 1] && Game.grid[y][x] !== player) {
+        totalCaptured++;
       }
     }
   }
-  
-  for (let y = 0; y < Game.height; y++) {
-    for (let x = 0; x < Game.width; x++) {
-      const ex = x + 1;
-      const ey = y + 1;
-      
-      if (!visited[ey][ex]) {
-        if (Game.grid[y][x] === 0 || Game.grid[y][x] !== player) {
-          totalCaptured++;
-        }
-      }
-    }
-  }
-  
+
   return totalCaptured;
 }
+
 
 // ====================================================================
 // GAME FLOW CONTROL
@@ -1005,15 +1316,42 @@ function switchPlayer() {
  * Skip current player's turn
  * @function skipTurn
  */
-function skipTurn() {
-  if (Game.diceRolled || Game.gameOver || Game.isReplayMode) return;
-  
-  console.log("Skipping turn...");
-  
-  logMove('skip', {});
+function autoSkipTurn(reason = 'no_moves') {
+  if (Game.gameOver || Game.isReplayMode) return;
+
+  console.log(`Auto-skipping turn (${reason})...`);
+
+  // Log the auto-skip as a move (dice_roll is already logged separately)
+  logMove('auto_skip', {
+    reason,
+    dice1: Game.diceValues[0],
+    dice2: Game.diceValues[1],
+    isKush: Game.isKush
+  });
+
+  // Reset turn state (so next player can roll)
+  Game.diceRolled = false;
+  Game.isKush = false;
+  Game.rectangleOrientation = 0;
+  Game.rectanglePosition = { x: -1, y: -1 };
+  Game.isValidPlacement = false;
+
+  if (DOM.kushIndicator) {
+    DOM.kushIndicator.style.display = 'none';
+  }
+
   switchPlayer();
   updateUI();
   renderGrid();
+
+  if (DOM.gameStatus) {
+    DOM.gameStatus.textContent = `No valid moves for previous roll — ${getCurrentPlayerName()}'s turn`;
+  }
+}
+
+// Backward-compatible wrapper (UI skip removed, but keep for any internal calls)
+function skipTurn() {
+  autoSkipTurn('manual');
 }
 
 /**
@@ -1078,6 +1416,39 @@ function getPlayerCellCount(player) {
 function getCurrentPlayerName() {
   return Game.currentPlayer === 1 ? Game.player1Name : Game.player2Name;
 }
+
+
+/**
+ * Check if the current preview rectangle "touches" current player's territory.
+ * Touch means 8-neighborhood contact (including diagonals). Overlap also counts as touch.
+ * This is used ONLY for preview border coloring (UX), not for validating placement rules.
+ * @function previewTouchesPlayer
+ * @param {number} x
+ * @param {number} y
+ * @param {number} w
+ * @param {number} h
+ * @param {number} player
+ * @returns {boolean}
+ */
+function previewTouchesPlayer(x, y, w, h, player) {
+  if (!Game.grid) return false;
+
+  const x0 = Math.max(0, x - 1);
+  const y0 = Math.max(0, y - 1);
+  const x1 = Math.min(Game.width - 1, x + w);   // inclusive
+  const y1 = Math.min(Game.height - 1, y + h);  // inclusive
+
+  for (let yy = y0; yy <= y1; yy++) {
+    for (let xx = x0; xx <= x1; xx++) {
+      // If any cell in the 1-cell expanded box belongs to player, it's a touch.
+      if (Game.grid[yy][xx] === player) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 
 // ====================================================================
 // RENDERING
@@ -1159,21 +1530,87 @@ function renderGrid() {
   // Draw placement preview
   if (Game.diceRolled && Game.rectanglePosition.x >= 0 && Game.rectanglePosition.y >= 0) {
     const dim = getRectangleDimensions();
-    const screenX = Game.rectanglePosition.x * Game.cellSize * scale + offsetX;
-    const screenY = Game.rectanglePosition.y * Game.cellSize * scale + offsetY;
+    const gridX = Game.rectanglePosition.x;
+    const gridY = Game.rectanglePosition.y;
+
+    const screenX = gridX * Game.cellSize * scale + offsetX;
+    const screenY = gridY * Game.cellSize * scale + offsetY;
     const previewWidth = dim.width * Game.cellSize * scale;
     const previewHeight = dim.height * Game.cellSize * scale;
-    
-    ctx.fillStyle = Game.isValidPlacement ? 
-      Game.colors.preview : 
-      Game.colors.invalid;
+
+    // Neutral, non-misleading preview fill (always gray + transparent)
+    ctx.fillStyle = "rgba(148, 163, 184, 0.18)";
     ctx.fillRect(screenX, screenY, previewWidth, previewHeight);
-    
-    ctx.strokeStyle = Game.isValidPlacement ? Game.colors.highlight : "#ef4444";
+
+    // Border color rules:
+    // - Default: gray translucent border
+    // - If preview touches CURRENT player's territory (8-neighborhood): border becomes player's color
+    // - Touching opponent's cells should NOT change border color
+    const touchesOwn = previewTouchesPlayer(gridX, gridY, dim.width, dim.height, Game.currentPlayer);
+    const playerBorder = Game.currentPlayer === 1 ? Game.colors.player1 : Game.colors.player2;
+    const neutralBorder = "rgba(148, 163, 184, 0.9)";
+
+    ctx.save();
+
+    // If placement is not currently valid, use dashed border (but keep neutral/player color)
+    if (!Game.isValidPlacement) {
+      ctx.setLineDash([6, 4]);
+    } else {
+      ctx.setLineDash([]);
+    }
+
+    ctx.strokeStyle = touchesOwn ? playerBorder : neutralBorder;
     ctx.lineWidth = 2;
     ctx.strokeRect(screenX, screenY, previewWidth, previewHeight);
+
+    ctx.restore();
   }
-  
+
+
+
+// Highlight placement rectangle from Move History (hover or pinned)
+// - Border: bright green
+// - Fill: semi-transparent green
+// - Label: move number (1-based)
+{
+  const hi = Game.historyPinned || Game.historyHover;
+  if (hi && hi.rect) {
+    const r = hi.rect;
+    const screenX = r.x * Game.cellSize * scale + offsetX;
+    const screenY = r.y * Game.cellSize * scale + offsetY;
+    const w = r.width * Game.cellSize * scale;
+    const h = r.height * Game.cellSize * scale;
+
+    ctx.save();
+    ctx.setLineDash([]);
+
+    // Fill
+    ctx.fillStyle = "rgba(0, 255, 0, 0.16)";
+    ctx.fillRect(screenX, screenY, w, h);
+
+    // Border
+    ctx.strokeStyle = "rgba(0, 255, 0, 0.95)";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(screenX, screenY, w, h);
+
+    // Move number label (center-top-ish)
+    const label = String((hi.index ?? 0) + 1);
+    const fontSize = Math.max(12, Math.round(14 * scale));
+    ctx.font = `${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const tx = screenX + w / 2;
+    const ty = screenY + Math.min(h / 2, 18 * scale);
+    ctx.lineWidth = Math.max(3, Math.round(4 * scale));
+    ctx.strokeStyle = "rgba(0,0,0,0.85)";
+    ctx.strokeText(label, tx, ty);
+    ctx.fillStyle = "rgba(255,255,255,0.96)";
+    ctx.fillText(label, tx, ty);
+
+    ctx.restore();
+  }
+}
+
   // Draw starting positions
   drawStartingPositions();
 }
@@ -1311,8 +1748,6 @@ function updateUI() {
   
   if (DOM.rollBtn) DOM.rollBtn.disabled = Game.diceRolled || Game.gameOver || Game.isReplayMode;
   if (DOM.rotateBtn) DOM.rotateBtn.disabled = !Game.diceRolled || Game.gameOver || Game.isReplayMode;
-  if (DOM.skipBtn) DOM.skipBtn.disabled = Game.diceRolled || Game.gameOver || Game.isReplayMode;
-  
   if (DOM.historySlider) {
     DOM.historySlider.max = Game.moveHistory.length;
     DOM.historySlider.value = Game.isReplayMode ? Game.replayPosition : Game.moveHistory.length;
@@ -1362,10 +1797,54 @@ function updateHistoryUI() {
     }
     
     item.textContent = moveText;
-    item.addEventListener('click', () => jumpToMove(index));
+    item.addEventListener('click', () => {
+      jumpToMove(index);
+      const m = Game.moveHistory[index];
+      // Toggle pinned highlight for placement moves in replay mode
+      if (Game.isReplayMode && m && m.type === 'placement') {
+        if (Game.historyPinned && Game.historyPinned.index === index) {
+          Game.historyPinned = null;
+        } else {
+          Game.historyPinned = { index, rect: { x: m.x, y: m.y, width: m.width, height: m.height } };
+        }
+      } else {
+        Game.historyPinned = null;
+      }
+      Game.historyHover = null;
+      renderGrid();
+      updateHistoryUI();
+    });
+
+    const onEnter = () => {
+      // Highlight ONLY when hovering the currently selected move in replay mode
+      if (!Game.isReplayMode || index !== Game.replayPosition) return;
+      const m = Game.moveHistory[index];
+      if (m && m.type === 'placement') {
+        Game.historyHover = { index, rect: { x: m.x, y: m.y, width: m.width, height: m.height } };
+        renderGrid();
+      }
+    };
+
+    const onLeave = () => {
+      if (Game.historyHover && Game.historyHover.index === index) {
+        Game.historyHover = null;
+        renderGrid();
+      }
+    };
+
+    // Mouse + Pointer events (Mac trackpads sometimes behave better with pointer events)
+    item.addEventListener('mouseenter', onEnter);
+    item.addEventListener('mousemove', onEnter);
+    item.addEventListener('mouseleave', onLeave);
+
+    item.addEventListener('pointerenter', onEnter);
+    item.addEventListener('pointermove', onEnter);
+    item.addEventListener('pointerleave', onLeave);
+
     DOM.historyList.appendChild(item);
   });
 }
+
 
 // ====================================================================
 // MOVE HISTORY AND LOGGING
@@ -1456,41 +1935,55 @@ function loadGridSnapshot(snapshot) {
  */
 function jumpToMove(index) {
   if (index < 0 || index > Game.moveHistory.length) return;
-  
+
   console.log(`Jumping to move ${index}`);
-  
+
   Game.isReplayMode = true;
   Game.replayPosition = index;
-  
-  startNewGame();
-  
+  Game.historyHover = null;
+  Game.historyPinned = null;
+
+  // IMPORTANT:
+  // We must NOT clear moveHistory when resetting the board for replay,
+  // otherwise navigation breaks.
+  startNewGame({ preserveHistory: true, preserveReplay: true });
+
+  // Apply grid snapshots up to requested position (fast + stable even if rules change)
+  let lastSnapshot = null;
   for (let i = 0; i < index; i++) {
     const move = Game.moveHistory[i];
-    
-    if (move.type === 'placement') {
-      Game.currentPlayer = move.playerId;
-      Game.diceValues = [move.dice1, move.dice2];
-      Game.isKush = move.isKush;
-      
-      const dim = move.orientation === 0 ? 
-        { width: move.dice1, height: move.dice2 } :
-        { width: move.dice2, height: move.dice1 };
-      
-      for (let dy = 0; dy < dim.height; dy++) {
-        for (let dx = 0; dx < dim.width; dx++) {
-          Game.grid[move.y + dy][move.x + dx] = move.playerId;
-        }
+    if (move && move.gridSnapshot) lastSnapshot = move.gridSnapshot;
+  }
+  if (lastSnapshot) {
+    loadGridSnapshot(lastSnapshot);
+  }
+
+  // Restore "turn" meta state based on the last processed move
+  if (index === 0) {
+    Game.currentPlayer = 1;
+    Game.diceRolled = false;
+    Game.isKush = false;
+  } else {
+    const lastMove = Game.moveHistory[index - 1];
+    if (lastMove) {
+      if (lastMove.type === 'dice_roll') {
+        Game.currentPlayer = lastMove.playerId;
+        Game.diceValues = [lastMove.dice1, lastMove.dice2];
+        Game.diceRolled = true;
+        Game.isKush = !!lastMove.isKush;
+      } else if (lastMove.type === 'placement' || lastMove.type === 'skip') {
+        Game.currentPlayer = lastMove.playerId === 1 ? 2 : 1;
+        Game.diceRolled = false;
+        Game.isKush = false;
       }
-      
-      captureContours();
-      Game.currentPlayer = Game.currentPlayer === 1 ? 2 : 1;
     }
   }
-  
+
+  // If the move at "index" itself has a snapshot (placements), show it
   if (Game.moveHistory[index] && Game.moveHistory[index].gridSnapshot) {
     loadGridSnapshot(Game.moveHistory[index].gridSnapshot);
   }
-  
+
   updateUI();
   renderGrid();
   updateHistoryUI();
@@ -1523,6 +2016,8 @@ function nextMove() {
 function exitReplayMode() {
   Game.isReplayMode = false;
   Game.replayPosition = Game.moveHistory.length;
+  Game.historyHover = null;
+  Game.historyPinned = null;
   
   if (Game.moveHistory.length > 0) {
     const lastMove = Game.moveHistory[Game.moveHistory.length - 1];
@@ -1602,7 +2097,54 @@ function openImportModal() {
  * Close modal
  * @function closeModal
  */
-function closeModal() {
+
+/**
+ * Open settings drawer
+ */
+function openSettingsDrawer() {
+  if (!DOM.settingsDrawer || !DOM.drawerBackdrop) return;
+  DOM.settingsDrawer.classList.add('open');
+  DOM.drawerBackdrop.classList.add('open');
+  DOM.settingsDrawer.setAttribute('aria-hidden', 'false');
+  DOM.drawerBackdrop.setAttribute('aria-hidden', 'false');
+}
+
+/**
+ * Close settings drawer
+ */
+function closeSettingsDrawer() {
+  if (!DOM.settingsDrawer || !DOM.drawerBackdrop) return;
+  DOM.settingsDrawer.classList.remove('open');
+  DOM.drawerBackdrop.classList.remove('open');
+  DOM.settingsDrawer.setAttribute('aria-hidden', 'true');
+  DOM.drawerBackdrop.setAttribute('aria-hidden', 'true');
+}
+
+/**
+ * Open rules modal
+ * @function openRulesModal
+ */
+function openRulesModal() {
+  if (DOM.rulesModal) {
+    DOM.rulesModal.classList.add('active');
+  }
+}
+
+/**
+ * Close rules modal
+ * @function closeRulesModal
+ */
+function closeRulesModal() {
+  if (DOM.rulesModal) {
+    DOM.rulesModal.classList.remove('active');
+  }
+}
+
+/**
+ * Close import/export modal
+ * @function closeImportExportModal
+ */
+function closeImportExportModal() {
   if (DOM.importExportModal) {
     DOM.importExportModal.classList.remove('active');
   }
@@ -1957,10 +2499,6 @@ function handleHotkey(event) {
       break;
     case 's':
       if (DOM.rotateBtn && !DOM.rotateBtn.disabled) rotateRectangle();
-      break;
-    case ' ':
-      if (DOM.skipBtn && !DOM.skipBtn.disabled) skipTurn();
-      event.preventDefault();
       break;
     case '+':
     case '=':

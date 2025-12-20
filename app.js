@@ -76,6 +76,7 @@ const DOM = {
   
   // Buttons
   newGameBtn: null,
+  rulesBtn: null,
   rollBtn: null,
   rotateBtn: null,
   exportBtn: null,
@@ -115,13 +116,15 @@ const DOM = {
   totalMoves: null,
   
   // Modal
+  rulesModal: null,
+  rulesModalClose: null,
   importExportModal: null,
+  importExportModalClose: null,
   exportTextarea: null,
   importTextarea: null,
   copyBtn: null,
   loadBtn: null,
   importAlert: null,
-  modalClose: null,
   tabBtns: null
 };
 
@@ -173,6 +176,7 @@ function setupDOMReferences() {
   
   // Buttons
   DOM.newGameBtn = document.getElementById('newGameBtn');
+  DOM.rulesBtn = document.getElementById('rulesBtn');
   DOM.rollBtn = document.getElementById('rollBtn');
   DOM.rotateBtn = document.getElementById('rotateBtn');
   DOM.exportBtn = document.getElementById('exportBtn');
@@ -212,13 +216,15 @@ function setupDOMReferences() {
   DOM.totalMoves = document.getElementById('totalMoves');
   
   // Modal
+  DOM.rulesModal = document.getElementById('rulesModal');
+  DOM.rulesModalClose = document.getElementById('rulesModalClose');
   DOM.importExportModal = document.getElementById('importExportModal');
+  DOM.importExportModalClose = document.getElementById('importExportModalClose');
   DOM.exportTextarea = document.getElementById('exportTextarea');
   DOM.importTextarea = document.getElementById('importTextarea');
   DOM.copyBtn = document.getElementById('copyBtn');
   DOM.loadBtn = document.getElementById('loadBtn');
   DOM.importAlert = document.getElementById('importAlert');
-  DOM.modalClose = document.querySelector('.modal-close');
   DOM.tabBtns = document.querySelectorAll('.tab-btn');
   
   console.log("DOM references set up");
@@ -284,6 +290,9 @@ function setupEventListeners() {
   if (DOM.settingsToggle) DOM.settingsToggle.addEventListener('click', openSettingsDrawer);
   if (DOM.settingsClose) DOM.settingsClose.addEventListener('click', closeSettingsDrawer);
   if (DOM.drawerBackdrop) DOM.drawerBackdrop.addEventListener('click', closeSettingsDrawer);
+  
+  // Rules button
+  if (DOM.rulesBtn) DOM.rulesBtn.addEventListener('click', openRulesModal);
 
   // Canvas controls
   if (DOM.zoomInBtn) DOM.zoomInBtn.addEventListener('click', () => changeZoom(0.2));
@@ -303,7 +312,8 @@ function setupEventListeners() {
   }
   
   // Modal controls
-  if (DOM.modalClose) DOM.modalClose.addEventListener('click', closeModal);
+  if (DOM.rulesModalClose) DOM.rulesModalClose.addEventListener('click', closeRulesModal);
+  if (DOM.importExportModalClose) DOM.importExportModalClose.addEventListener('click', closeImportExportModal);
   if (DOM.copyBtn) DOM.copyBtn.addEventListener('click', copyExportText);
   if (DOM.loadBtn) DOM.loadBtn.addEventListener('click', importGame);
   
@@ -2110,7 +2120,31 @@ function closeSettingsDrawer() {
   DOM.drawerBackdrop.setAttribute('aria-hidden', 'true');
 }
 
-function closeModal() {
+/**
+ * Open rules modal
+ * @function openRulesModal
+ */
+function openRulesModal() {
+  if (DOM.rulesModal) {
+    DOM.rulesModal.classList.add('active');
+  }
+}
+
+/**
+ * Close rules modal
+ * @function closeRulesModal
+ */
+function closeRulesModal() {
+  if (DOM.rulesModal) {
+    DOM.rulesModal.classList.remove('active');
+  }
+}
+
+/**
+ * Close import/export modal
+ * @function closeImportExportModal
+ */
+function closeImportExportModal() {
   if (DOM.importExportModal) {
     DOM.importExportModal.classList.remove('active');
   }

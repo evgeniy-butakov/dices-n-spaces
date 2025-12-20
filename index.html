@@ -19,6 +19,9 @@
         <button id="newGameBtn" class="btn btn-primary btn-header">
           <i class="fas fa-play-circle"></i> New Game
         </button>
+        <button id="rulesBtn" class="btn-icon" title="Rules">
+          <i class="fas fa-info-circle"></i>
+        </button>
         <button id="settingsToggle" class="btn-icon" title="Settings">
           <i class="fas fa-sliders-h"></i>
         </button>
@@ -105,7 +108,8 @@
             </button>
             <button id="rotateBtn" class="btn btn-action" disabled>
               <i class="fas fa-sync-alt"></i> Rotate (S)
-            </button>          </div>
+            </button>
+          </div>
           <div class="kush-indicator" id="kushIndicator">
             <i class="fas fa-crown"></i> KUSH MODE ACTIVE!
           </div>
@@ -168,49 +172,57 @@
             Viewing: <span id="replayPosition">Live</span> of <span id="totalMoves">0</span> moves
           </div>
         </div>
+      </div>
+    </div>
+  </div>
 
-        <!-- <div class="panel-section">
-          <h2><i class="fas fa-info-circle"></i> Game Rules</h2>
-          <div class="rules-list">
-            <div class="rule-item">
-              <i class="fas fa-dice"></i>
-              <span>Roll 2 dice to determine rectangle size (a×b or b×a)</span>
-            </div>
-            <div class="rule-item">
-              <i class="fas fa-vector-square"></i>
-              <span>Place rectangle adjacent to your territory (8-direction)</span>
-            </div>
-            <div class="rule-item">
-              <i class="fas fa-crown"></i>
-              <span><strong>KUSH</strong>: When dice are equal, place anywhere, overwriting opponents</span>
-            </div>
-            <div class="rule-item">
-              <i class="fas fa-draw-polygon"></i>
-              <span>After placement, enclosed areas become yours</span>
-            </div>
-            <div class="rule-item">
-              <i class="fas fa-flag-checkered"></i>
-              <span>Game ends when no free cells remain</span>
-            </div>
+  <!-- Rules Modal -->
+  <div id="rulesModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fas fa-info-circle"></i> Game Rules</h3>
+        <button class="modal-close" id="rulesModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="rules-list">
+          <div class="rule-item">
+            <i class="fas fa-dice"></i>
+            <span>Roll 2 dice to determine rectangle size (a×b or b×a)</span>
           </div>
-          <div class="hotkeys-info">
-            <h3><i class="fas fa-keyboard"></i> Hotkeys</h3>
-            <div class="hotkey-item"><kbd>R</kbd> Roll Dice</div>
-            <div class="hotkey-item"><kbd>S</kbd> Rotate Rectangle</div>
-                        <div class="hotkey-item"><kbd>+</kbd> Zoom In</div>
-            <div class="hotkey-item"><kbd>-</kbd> Zoom Out</div>
+          <div class="rule-item">
+            <i class="fas fa-vector-square"></i>
+            <span>Place rectangle adjacent to your territory (8-direction)</span>
+          </div>
+          <div class="rule-item">
+            <i class="fas fa-crown"></i>
+            <span><strong>KUSH</strong>: When dice are equal, place anywhere, overwriting opponents</span>
+          </div>
+          <div class="rule-item">
+            <i class="fas fa-draw-polygon"></i>
+            <span>After placement, enclosed areas become yours</span>
+          </div>
+          <div class="rule-item">
+            <i class="fas fa-flag-checkered"></i>
+            <span>Game ends when no free cells remain</span>
           </div>
         </div>
+        <div class="hotkeys-info">
+          <h3><i class="fas fa-keyboard"></i> Hotkeys</h3>
+          <div class="hotkey-item"><kbd>R</kbd> Roll Dice</div>
+          <div class="hotkey-item"><kbd>S</kbd> Rotate Rectangle</div>
+          <div class="hotkey-item"><kbd>+</kbd> Zoom In</div>
+          <div class="hotkey-item"><kbd>-</kbd> Zoom Out</div>
+        </div>
       </div>
-    </div></div>
-    -->
+    </div>
+  </div>
 
   <!-- Import/Export Modal -->
   <div id="importExportModal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
         <h3><i class="fas fa-file-export"></i> Import / Export Game</h3>
-        <button class="modal-close">&times;</button>
+        <button class="modal-close" id="importExportModalClose">&times;</button>
       </div>
       <div class="modal-body">
         <div class="modal-tabs">
