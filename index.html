@@ -91,29 +91,6 @@
           </div>
           <div class="game-status" id="gameStatus">Ready to start</div>
         </div>
-
-        <div class="panel-section">
-          <h2><i class="fas fa-dice"></i> Dice & Actions</h2>
-          <div class="dice-container">
-            <div class="die" id="die1">
-              <div class="dot-container"></div>
-            </div>
-            <div class="die" id="die2">
-              <div class="dot-container"></div>
-            </div>
-          </div>
-          <div class="action-buttons">
-            <button id="rollBtn" class="btn btn-action" disabled>
-              <i class="fas fa-redo"></i> Roll Dice (R)
-            </button>
-            <button id="rotateBtn" class="btn btn-action" disabled>
-              <i class="fas fa-sync-alt"></i> Rotate (S)
-            </button>
-          </div>
-          <div class="kush-indicator" id="kushIndicator">
-            <i class="fas fa-crown"></i> KUSH MODE ACTIVE!
-          </div>
-        </div>
       </div>
 
 
@@ -136,8 +113,31 @@
         </div>
       </div>
 
-      <!-- Right panel: Game log & history -->
+      <!-- Right panel: Dice & Actions + Move History -->
       <div class="right-panel">
+        <div class="panel-section">
+          <h2><i class="fas fa-dice"></i> Dice & Actions</h2>
+          <div class="dice-container">
+            <div class="die" id="die1">
+              <div class="dot-container"></div>
+            </div>
+            <div class="die" id="die2">
+              <div class="dot-container"></div>
+            </div>
+          </div>
+          <div class="action-buttons">
+            <button id="rollBtn" class="btn btn-action" disabled>
+              <i class="fas fa-redo"></i> Roll Dice (R)
+            </button>
+            <button id="rotateBtn" class="btn btn-action" disabled>
+              <i class="fas fa-sync-alt"></i> Rotate (S)
+            </button>
+          </div>
+          <div class="kush-indicator" id="kushIndicator">
+            <i class="fas fa-crown"></i> KUSH MODE ACTIVE!
+          </div>
+        </div>
+
         <div class="panel-section">
           <h2><i class="fas fa-history"></i> Move History</h2>
           <div class="log-controls">
