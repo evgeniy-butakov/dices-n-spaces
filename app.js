@@ -2307,8 +2307,16 @@ function handleCanvasClick(event) {
   const y = event.clientY - rect.top;
   
   const scale = Game.zoomLevel;
-  const offsetX = Game.panOffset.x;
-  const offsetY = Game.panOffset.y;
+  
+  // Calculate centering offsets (same as in renderGrid)
+  const gridPixelWidth = Game.width * Game.cellSize * scale;
+  const gridPixelHeight = Game.height * Game.cellSize * scale;
+  const centerOffsetX = (Game.canvas.width - gridPixelWidth) / 2;
+  const centerOffsetY = (Game.canvas.height - gridPixelHeight) / 2;
+  
+  // Combine centering with pan offset
+  const offsetX = centerOffsetX + Game.panOffset.x;
+  const offsetY = centerOffsetY + Game.panOffset.y;
   
   const gridX = Math.floor((x - offsetX) / (Game.cellSize * scale));
   const gridY = Math.floor((y - offsetY) / (Game.cellSize * scale));
@@ -2343,8 +2351,16 @@ function handleMouseMove(event) {
     renderGrid();
   } else if (Game.diceRolled && !Game.gameOver && !Game.isReplayMode) {
     const scale = Game.zoomLevel;
-    const offsetX = Game.panOffset.x;
-    const offsetY = Game.panOffset.y;
+    
+    // Calculate centering offsets (same as in renderGrid)
+    const gridPixelWidth = Game.width * Game.cellSize * scale;
+    const gridPixelHeight = Game.height * Game.cellSize * scale;
+    const centerOffsetX = (Game.canvas.width - gridPixelWidth) / 2;
+    const centerOffsetY = (Game.canvas.height - gridPixelHeight) / 2;
+    
+    // Combine centering with pan offset
+    const offsetX = centerOffsetX + Game.panOffset.x;
+    const offsetY = centerOffsetY + Game.panOffset.y;
     
     const gridX = Math.floor((x - offsetX) / (Game.cellSize * scale));
     const gridY = Math.floor((y - offsetY) / (Game.cellSize * scale));

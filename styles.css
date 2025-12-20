@@ -307,7 +307,7 @@ h2 i {
 .action-buttons {
   display: flex;
   gap: 12px;
-  margin-top: 20px;
+  margin-top: 11px;
 }
 
 /* ===== DICE ===== */
@@ -315,19 +315,19 @@ h2 i {
   display: flex;
   justify-content: center;
   gap: 30px;
-  margin: 20px 0;
+  margin: 8px 0;
 }
 
 .die {
-  width: 80px;
-  height: 80px;
+  width: 70px;
+  height: 70px;
   background: white;
-  border-radius: 12px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
   transition: transform 0.3s ease;
 }
 
@@ -361,13 +361,16 @@ h2 i {
 .kush-indicator {
   background: linear-gradient(135deg, #f72585 0%, #b5179e 100%);
   color: white;
-  padding: 12px;
-  border-radius: 8px;
+  padding: 4px 10px;
+  border-radius: 16px;
   text-align: center;
   font-weight: bold;
-  margin-top: 20px;
+  font-size: 0.8rem;
+  margin: 0 auto 8px auto;
+  max-width: 140px;
   display: none;
   animation: pulse 2s infinite;
+  box-shadow: 0 3px 10px rgba(247, 37, 133, 0.4);
 }
 
 @keyframes pulse {
