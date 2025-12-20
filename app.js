@@ -1459,16 +1459,22 @@ function previewTouchesPlayer(x, y, w, h, player) {
 
 /**
  * Calculate optimal cell size based on canvas and grid dimensions
+ * Ensures cells are always SQUARE by using the same size for width and height
  * @function calculateCellSize
  */
 function calculateCellSize() {
   if (!Game.canvas) return;
   
-  const maxWidth = Game.canvas.width / (Game.width * Game.zoomLevel);
-  const maxHeight = Game.canvas.height / (Game.height * Game.zoomLevel);
-  Game.cellSize = Math.min(maxWidth, maxHeight, 20);
+  // Calculate size based on filling the width and height
+  const cellSizeByWidth = Game.canvas.width / Game.width;
+  const cellSizeByHeight = Game.canvas.height / Game.height;
   
-  console.log(`Cell size calculated: ${Game.cellSize}px`);
+  // Use the smaller of the two to ensure:
+  // 1. The entire grid fits in the canvas
+  // 2. Cells are perfectly SQUARE (same width and height)
+  Game.cellSize = Math.min(cellSizeByWidth, cellSizeByHeight);
+  
+  console.log(`Cell size calculated: ${Game.cellSize}px (SQUARE, canvas: ${Game.canvas.width}x${Game.canvas.height}, grid: ${Game.width}x${Game.height})`);
 }
 
 /**
@@ -1502,8 +1508,16 @@ function renderGrid() {
   ctx.clearRect(0, 0, Game.canvas.width, Game.canvas.height);
   
   const scale = Game.zoomLevel;
-  const offsetX = Game.panOffset.x;
-  const offsetY = Game.panOffset.y;
+  
+  // Calculate centering offsets
+  const gridPixelWidth = Game.width * Game.cellSize * scale;
+  const gridPixelHeight = Game.height * Game.cellSize * scale;
+  const centerOffsetX = (Game.canvas.width - gridPixelWidth) / 2;
+  const centerOffsetY = (Game.canvas.height - gridPixelHeight) / 2;
+  
+  // Combine centering with pan offset
+  const offsetX = centerOffsetX + Game.panOffset.x;
+  const offsetY = centerOffsetY + Game.panOffset.y;
   
   // Draw cells
   for (let y = 0; y < Game.height; y++) {
@@ -1625,8 +1639,16 @@ function renderGrid() {
 function drawStartingPositions() {
   const ctx = Game.ctx;
   const scale = Game.zoomLevel;
-  const offsetX = Game.panOffset.x;
-  const offsetY = Game.panOffset.y;
+  
+  // Calculate centering offsets (same as in renderGrid)
+  const gridPixelWidth = Game.width * Game.cellSize * scale;
+  const gridPixelHeight = Game.height * Game.cellSize * scale;
+  const centerOffsetX = (Game.canvas.width - gridPixelWidth) / 2;
+  const centerOffsetY = (Game.canvas.height - gridPixelHeight) / 2;
+  
+  // Combine centering with pan offset
+  const offsetX = centerOffsetX + Game.panOffset.x;
+  const offsetY = centerOffsetY + Game.panOffset.y;
   
   const startPositions = [];
   for (let y = 0; y < Game.height; y++) {
@@ -2406,12 +2428,12 @@ function changeZoom(delta) {
 }
 
 /**
- * Center view on game field
+ * Center view on game field (reset pan offset)
  * @function centerView
  */
 function centerView() {
-  Game.panOffset.x = (Game.canvas.width - Game.width * Game.cellSize * Game.zoomLevel) / 2;
-  Game.panOffset.y = (Game.canvas.height - Game.height * Game.cellSize * Game.zoomLevel) / 2;
+  Game.panOffset.x = 0;
+  Game.panOffset.y = 0;
   renderGrid();
 }
 
