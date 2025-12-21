@@ -24,6 +24,7 @@ const Game = {
   replayPosition: 0,
   historyHover: null, // {index, rect:{x,y,width,height}} transient hover highlight from history
   historyPinned: null, // {index, rect:{x,y,width,height}} pinned highlight (toggle on click)
+  consecutiveSkips: 0, // Track consecutive skips by both players
   
   // Players
   player1Name: "Player 1",
@@ -455,6 +456,7 @@ function startNewGame(options = {}) {
   Game.rectanglePosition = { x: -1, y: -1 };
   Game.isValidPlacement = false;
   Game.gameOver = false;
+  Game.consecutiveSkips = 0;
   // Clear any history highlight overlays
   Game.historyHover = null;
   Game.historyPinned = null;
@@ -761,6 +763,9 @@ function placeRectangle() {
     overwrittenSelf: overwrittenSelf,
     capturedByContour: capturedByContour
   });
+  
+  // Reset consecutive skips counter on successful placement
+  Game.consecutiveSkips = 0;
   
   checkGameOver();
   
@@ -1371,6 +1376,10 @@ function autoSkipTurn(reason = 'no_moves') {
     dice2: Game.diceValues[1],
     isKush: Game.isKush
   });
+  
+  // Increment consecutive skips counter
+  Game.consecutiveSkips++;
+  console.log(`Consecutive skips: ${Game.consecutiveSkips}`);
 
   // Reset turn state (so next player can roll)
   Game.diceRolled = false;
@@ -1427,12 +1436,11 @@ function checkGameOver() {
     }
   }
   
-  console.log(`CheckGameOver: Empty=${emptyCount}, P1=${player1Count}, P2=${player2Count}`);
+  console.log(`CheckGameOver: Empty=${emptyCount}, P1=${player1Count}, P2=${player2Count}, ConsecutiveSkips=${Game.consecutiveSkips}`);
   
-  // Game over if:
-  // 1. No empty cells left, OR
-  // 2. One player has captured everything (other player has 0 cells)
-  if (emptyCount === 0 || player1Count === 0 || player2Count === 0) {
+  // Game over ONLY if no empty cells left
+  // Players with 0 cells can still get KUSH and continue playing
+  if (emptyCount === 0) {
     Game.gameOver = true;
     
     const score1 = player1Count;

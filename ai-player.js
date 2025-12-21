@@ -40,38 +40,66 @@ class AIPlayer {
   async takeTurn(gameAPI) {
     console.log(`AI Player ${this.playerId} taking turn...`);
     
-    // Wait a bit before doing anything (simulate human reaction time)
-    await this._delay(this.options.thinkingDelay);
-    
-    // Step 1: Roll dice (if not already rolled)
-    if (!gameAPI.isDiceRolled()) {
-      console.log('AI: Rolling dice...');
-      await gameAPI.rollDice();
-      await this._delay(this.options.moveDelay);
+    try {
+      // Wait a bit before doing anything (simulate human reaction time)
+      await this._delay(this.options.thinkingDelay);
+      
+      // Step 1: Roll dice (if not already rolled)
+      if (!gameAPI.isDiceRolled()) {
+        console.log('AI: Rolling dice...');
+        await gameAPI.rollDice();
+        await this._delay(this.options.moveDelay);
+      } else {
+        console.log('AI: Dice already rolled');
+      }
+      
+      // Step 2: Get current game state
+      console.log('AI: Getting game state...');
+      const gameState = gameAPI.getGameState();
+      console.log(`AI: Game state - diceValues: [${gameState.diceValues}], isKush: ${gameState.isKush}, currentPlayer: ${gameState.currentPlayer}`);
+      
+      // CRITICAL: Check if we're still the current player
+      // (auto-skip might have switched players already)
+      if (gameState.currentPlayer !== this.playerId) {
+        console.log(`AI: Player switched to ${gameState.currentPlayer}, aborting turn`);
+        return { action: 'abort', reason: 'player_switched' };
+      }
+      
+      // Step 3: Decide on placement
+      console.log('AI: Choosing placement...');
+      const placement = this.choosePlacement(gameState);
+      
+      if (!placement) {
+        console.log('AI: No valid placement found, skipping turn');
+        await gameAPI.skipTurn();
+        return { action: 'skip' };
+      }
+      
+      // Step 4: Execute placement
+      console.log(`AI: Placing at (${placement.x}, ${placement.y}), orientation=${placement.orientation}`);
+      await gameAPI.placePiece(placement.x, placement.y, placement.orientation);
+      
+      console.log('AI: Turn completed successfully');
+      return { 
+        action: 'place', 
+        x: placement.x, 
+        y: placement.y, 
+        orientation: placement.orientation 
+      };
+    } catch (error) {
+      console.error('AI: Error during turn:', error);
+      console.error('AI: Error stack:', error.stack);
+      
+      // Try to skip turn as fallback
+      try {
+        console.log('AI: Attempting to skip turn after error...');
+        await gameAPI.skipTurn();
+      } catch (skipError) {
+        console.error('AI: Failed to skip turn:', skipError);
+      }
+      
+      throw error;
     }
-    
-    // Step 2: Get current game state
-    const gameState = gameAPI.getGameState();
-    
-    // Step 3: Decide on placement
-    const placement = this.choosePlacement(gameState);
-    
-    if (!placement) {
-      console.log('AI: No valid placement found, skipping turn');
-      await gameAPI.skipTurn();
-      return { action: 'skip' };
-    }
-    
-    // Step 4: Execute placement
-    console.log(`AI: Placing at (${placement.x}, ${placement.y}), orientation=${placement.orientation}`);
-    await gameAPI.placePiece(placement.x, placement.y, placement.orientation);
-    
-    return { 
-      action: 'place', 
-      x: placement.x, 
-      y: placement.y, 
-      orientation: placement.orientation 
-    };
   }
   
   /**
@@ -105,6 +133,8 @@ class AIPlayer {
     const { grid, width, height, diceValues, isKush, currentPlayer, validationFn } = gameState;
     const possibleMoves = [];
     
+    console.log(`AI: Generating moves for ${diceValues[0]}×${diceValues[1]}, player=${currentPlayer}, KUSH=${isKush}`);
+    
     // Get rectangle dimensions for both orientations
     const dim1 = { width: diceValues[0], height: diceValues[1] };
     const dim2 = { width: diceValues[1], height: diceValues[0] };
@@ -112,33 +142,45 @@ class AIPlayer {
     // Try both orientations (unless it's a square)
     const orientations = diceValues[0] === diceValues[1] ? [0] : [0, 1];
     
+    let checkedCount = 0;
+    let errorCount = 0;
+    
     for (let orientation of orientations) {
       const dim = orientation === 0 ? dim1 : dim2;
       
       // Try all positions on the grid
       for (let y = 0; y <= height - dim.height; y++) {
         for (let x = 0; x <= width - dim.width; x++) {
-          // Use game's validation function if provided, otherwise use our own
-          let isValid;
-          if (validationFn) {
-            isValid = validationFn(x, y, dim.width, dim.height);
-          } else {
-            isValid = this._isValidPlacement(grid, x, y, dim.width, dim.height, currentPlayer, isKush, width, height);
-          }
+          checkedCount++;
           
-          if (isValid) {
-            possibleMoves.push({
-              x: x,
-              y: y,
-              orientation: orientation,
-              score: 0 // For future: score can be used for better AI strategies
-            });
+          try {
+            // Use game's validation function if provided, otherwise use our own
+            let isValid;
+            if (validationFn) {
+              isValid = validationFn(x, y, dim.width, dim.height);
+            } else {
+              isValid = this._isValidPlacement(grid, x, y, dim.width, dim.height, currentPlayer, isKush, width, height);
+            }
+            
+            if (isValid) {
+              possibleMoves.push({
+                x: x,
+                y: y,
+                orientation: orientation,
+                score: 0 // For future: score can be used for better AI strategies
+              });
+            }
+          } catch (error) {
+            errorCount++;
+            if (errorCount <= 3) {  // Log only first 3 errors
+              console.error(`AI: Validation error at (${x},${y}) orientation=${orientation}:`, error.message);
+            }
           }
         }
       }
     }
     
-    console.log(`AI: Found ${possibleMoves.length} possible moves`);
+    console.log(`AI: Checked ${checkedCount} positions, found ${possibleMoves.length} valid moves, ${errorCount} errors`);
     return possibleMoves;
   }
   
