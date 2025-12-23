@@ -72,6 +72,104 @@ const AIState = {
 let gameAPI = null;
 
 // ====================================================================
+// TEST MODE: DICE OVERRIDE SYSTEM
+// ====================================================================
+
+/**
+ * Test mode allows setting specific dice rolls for AI testing
+ * Usage in console:
+ *   TestMode.enabled = true;
+ *   TestMode.addDice(1, 1);  // KUSH 1x1
+ *   TestMode.addDice(2, 3);  // Normal 2x3
+ *   TestMode.addDice(4, 4);  // KUSH 4x4
+ */
+const TestMode = {
+  enabled: false,
+  diceSequence: [],
+  currentIndex: 0,
+  playerFilter: null,
+  
+  addDice: function(die1, die2) {
+    if (die1 < 1 || die1 > 6 || die2 < 1 || die2 > 6) {
+      console.error(`Invalid dice values: [${die1}, ${die2}]. Must be 1-6.`);
+      return;
+    }
+    this.diceSequence.push([die1, die2]);
+    console.log(`✅ Test dice added: [${die1}, ${die2}] - Total in sequence: ${this.diceSequence.length}`);
+  },
+  
+  getNextDice: function(currentPlayer) {
+    if (!this.enabled) return null;
+    
+    if (this.playerFilter !== null && currentPlayer !== this.playerFilter) {
+      console.log(`🎲 Test mode: Skipping player ${currentPlayer} (filter=${this.playerFilter}), using random`);
+      return null;
+    }
+    
+    if (this.diceSequence.length === 0) {
+      console.warn('⚠️ Test mode: No dice in sequence, using random');
+      return null;
+    }
+    
+    const dice = this.diceSequence[this.currentIndex];
+    this.currentIndex = (this.currentIndex + 1) % this.diceSequence.length;
+    console.log(`🎲 Test mode: Using dice [${dice[0]}, ${dice[1]}] for Player ${currentPlayer} (${this.currentIndex}/${this.diceSequence.length})`);
+    return dice;
+  },
+  
+  reset: function() {
+    this.currentIndex = 0;
+    console.log('🔄 Test mode: Sequence reset to beginning');
+  },
+  
+  clear: function() {
+    this.diceSequence = [];
+    this.currentIndex = 0;
+    console.log('🗑️ Test mode: Sequence cleared');
+  },
+  
+  setupKushTest: function() {
+    this.clear();
+    this.addDice(1, 1);
+    this.addDice(1, 1);
+    this.enabled = true;
+    this.playerFilter = null;
+    console.log('🚀 Test mode: KUSH lockdown test ready (P2 will get KUSH on turn 2)');
+  },
+  
+  setupMultiKush: function() {
+    this.clear();
+    this.addDice(6, 1);
+    this.addDice(2, 2);
+    this.addDice(3, 2);
+    this.addDice(3, 3);
+    this.enabled = true;
+    this.playerFilter = null;
+    console.log('🚀 Test mode: Multiple KUSH test ready');
+  },
+  
+  aiOnly: function() {
+    this.playerFilter = 2;
+    console.log('🤖 Test mode: Only affecting Player 2 (AI)');
+  },
+  
+  humanOnly: function() {
+    this.playerFilter = 1;
+    console.log('👤 Test mode: Only affecting Player 1 (Human)');
+  },
+  
+  status: function() {
+    console.log('📊 Test Mode Status:');
+    console.log(`  Enabled: ${this.enabled}`);
+    console.log(`  Sequence: ${this.diceSequence.map(d => `[${d[0]},${d[1]}]`).join(', ')}`);
+    console.log(`  Current index: ${this.currentIndex}/${this.diceSequence.length}`);
+    console.log(`  Player filter: ${this.playerFilter === null ? 'All' : 'Player ' + this.playerFilter}`);
+  }
+};
+
+window.TestMode = TestMode;
+
+// ====================================================================
 // DOM ELEMENTS
 // ====================================================================
 
@@ -542,10 +640,18 @@ function rollDice() {
   if (DOM.die2) DOM.die2.classList.add('rolling');
   
   setTimeout(() => {
-    Game.diceValues = [
-      Math.floor(Math.random() * 6) + 1,
-      Math.floor(Math.random() * 6) + 1
-    ];
+    // TEST MODE: Check if we should use predefined dice
+    const testDice = TestMode.getNextDice(Game.currentPlayer);
+    
+    if (testDice) {
+      Game.diceValues = testDice;
+      console.log(`🎲 TEST MODE: Forced dice [${testDice[0]}, ${testDice[1]}]`);
+    } else {
+      Game.diceValues = [
+        Math.floor(Math.random() * 6) + 1,
+        Math.floor(Math.random() * 6) + 1
+      ];
+    }
     
     Game.isKush = Game.diceValues[0] === Game.diceValues[1];
     
