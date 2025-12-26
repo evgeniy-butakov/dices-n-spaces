@@ -2004,6 +2004,23 @@ function updateUI() {
   if (DOM.player2Display) DOM.player2Display.textContent = Game.player2Name;
   if (DOM.currentPlayerDisplay) DOM.currentPlayerDisplay.textContent = getCurrentPlayerName();
   
+  // Update player turn banner in right panel
+  const turnPlayerBannerName = document.getElementById('turnPlayerBannerName');
+  const playerTurnBanner = document.getElementById('playerTurnBanner');
+  
+  if (turnPlayerBannerName) {
+    turnPlayerBannerName.textContent = getCurrentPlayerName();
+  }
+  
+  if (playerTurnBanner) {
+    // Change banner color based on current player
+    if (Game.currentPlayer === 1) {
+      playerTurnBanner.classList.remove('player2');
+    } else {
+      playerTurnBanner.classList.add('player2');
+    }
+  }
+  
   if (Game.grid && Array.isArray(Game.grid) && Game.grid.length > 0) {
     const score1 = getPlayerCellCount(1);
     const score2 = getPlayerCellCount(2);

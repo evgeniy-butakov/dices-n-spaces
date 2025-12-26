@@ -357,6 +357,39 @@ h2 i {
   border-radius: 50%;
 }
 
+/* ===== PLAYER TURN BANNER (Right Panel) ===== */
+.player-turn-banner {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  padding: 12px 20px;
+  border-radius: 12px;
+  text-align: center;
+  margin-bottom: 15px;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  animation: pulse-banner 2s ease-in-out infinite;
+}
+
+.player-turn-banner.player2 {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.turn-player-name {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  display: block;
+}
+
+@keyframes pulse-banner {
+  0%, 100% { 
+    transform: scale(1);
+  }
+  50% { 
+    transform: scale(1.02);
+  }
+}
+
 /* ===== KUSH INDICATOR ===== */
 .kush-indicator {
   background: linear-gradient(135deg, #f72585 0%, #b5179e 100%);

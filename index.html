@@ -63,6 +63,26 @@
             <option value="BR">Bottom-Right</option>
           </select>
         </div>
+        
+        <!-- AI Settings -->
+        <div class="setting-item full-width" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #374151;">
+          <h3 style="margin-bottom: 15px;"><i class="fas fa-robot"></i> AI Player</h3>
+        </div>
+        <div class="setting-item">
+          <label for="aiDifficulty">AI Difficulty:</label>
+          <select id="aiDifficulty" class="ai-select">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard" disabled>Hard (Coming Soon)</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label for="aiPlayer">AI Player:</label>
+          <select id="aiPlayer" class="ai-select">
+            <option value="2">Player 2</option>
+            <option value="1">Player 1</option>
+          </select>
+        </div>
       </div>
     </aside>
 
@@ -70,31 +90,14 @@
     <div class="game-layout">
       <!-- Left panel: Game controls & info -->
       <div class="left-panel">
-        <!-- AI Player Section -->
-        <div class="panel-section ai-section">
-          <h2><i class="fas fa-robot"></i> AI Player</h2>
-          <div class="ai-controls">
-            <button id="aiToggle" class="btn btn-ai">
-              <i class="fas fa-robot"></i> Enable AI
-            </button>
-            <div class="ai-options">
-              <label>
-                <span>Difficulty:</span>
-                <select id="aiDifficulty" class="ai-select">
-                  <option value="easy">Easy</option>
-                  <option value="medium" selected>Medium</option>
-                  <option value="hard" disabled>Hard (Coming Soon)</option>
-                </select>
-              </label>
-              <label>
-                <span>AI Player:</span>
-                <select id="aiPlayer" class="ai-select">
-                  <option value="2">Player 2</option>
-                  <option value="1">Player 1</option>
-                </select>
-              </label>
-            </div>
-          </div>
+        <!-- AI Toggle Button -->
+        <div class="panel-section">
+          <button id="aiToggle" class="btn btn-ai" style="width: 100%;">
+            <i class="fas fa-robot"></i> Enable AI
+          </button>
+          <p style="margin-top: 10px; font-size: 0.85rem; color: #a0aec0; text-align: center;">
+            Configure AI in Settings <i class="fas fa-cog"></i>
+          </p>
         </div>
         
         <div class="panel-section">
@@ -143,7 +146,11 @@
       <!-- Right panel: Dice & Actions + Move History -->
       <div class="right-panel">
         <div class="panel-section">
-          <h2><i class="fas fa-dice"></i> Dice & Actions</h2>
+          <!-- Current Player Banner -->
+          <div class="player-turn-banner" id="playerTurnBanner">
+            <span class="turn-player-name" id="turnPlayerBannerName">Player 1</span>
+          </div>
+          
           <div class="kush-indicator" id="kushIndicator">
             <i class="fas fa-crown"></i> KUSH MODE
           </div>

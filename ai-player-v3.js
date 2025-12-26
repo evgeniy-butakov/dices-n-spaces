@@ -217,19 +217,20 @@ class AIPlayer {
   _chooseBestMove(possibleMoves, gameState) {
     console.log(`AI Medium: Evaluating ${possibleMoves.length} moves...`);
     
-    // SPECIAL CASE: First AI move with KUSH that can COMPLETELY COVER opponent's piece
-    // If this is AI's very first move and we have KUSH that covers all opponent cells,
-    // ALWAYS place at (0,0) to guarantee blocking opponent's corner until they get KUSH
+    // PRIORITY STRATEGY: Check if KUSH can capture opponent's pieces
+    // This applies to ANY turn where we have KUSH, not just first turn
     const { grid, width, height, diceValues, isKush, currentPlayer, turnNumber } = gameState;
     
-    // Check if this is AI's first turn
+    // Check if this is AI's first turn (for logging purposes)
     // Turn sequence: 1=P1 roll, 2=P1 place, 3=P2 roll, 4=P2 place, 5=P1 roll, etc.
     // So first turn for Player 2 is turns 3-4, for Player 1 is turns 1-2
     const isFirstAITurn = (currentPlayer === 2 && turnNumber <= 4) || 
                           (currentPlayer === 1 && turnNumber <= 2);
     
-    if (isFirstAITurn && isKush) {
-      console.log(`🎯 FIRST AI MOVE WITH KUSH ${diceValues[0]}×${diceValues[1]} - CHECKING COVERAGE...`);
+    // ALWAYS check for KUSH capture opportunities (not just first turn!)
+    if (isKush) {
+      const logPrefix = isFirstAITurn ? "🎯 FIRST AI MOVE" : "🎯 KUSH CAPTURE OPPORTUNITY";
+      console.log(`${logPrefix} WITH KUSH ${diceValues[0]}×${diceValues[1]} - CHECKING COVERAGE...`);
       console.log(`   Turn number: ${turnNumber}, Current player: ${currentPlayer}, Is first AI turn: ${isFirstAITurn}`);
       
       const kushWidth = diceValues[0];
